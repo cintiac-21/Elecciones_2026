@@ -479,7 +479,7 @@
         <span class="live-dot"></span>
         <span id="lastUpdate">Consultando ONPE en vivo...</span>
       </div>
-      <div class="hero-version">v3.4.2</div>
+      <div class="hero-version">v3.4.3</div>
     </div>
     <div class="hero-right">
       <button class="refresh-btn" id="refreshBtn" onclick="refreshFromONPE()">
@@ -818,21 +818,21 @@ function renderKPIs(values) {
   })).sort((a, b) => b.pct - a.pct);
 
   /*
-   * Ghost baseline — ONLY server-side sources (consistent across all clients):
-   * 1. _kvPrevCandidates (latest KV snapshot, ~3 min old)
-   * 2. TRACKING.cuts (historical KV cuts, added when national pct moved >0.3pp)
+   * Ghost baseline — server-side sources only for cross-client consistency:
+   * 1. _kvPrevCandidates (KV prev_snapshot) — any non-zero diff wins
+   * 2. TRACKING.cuts (KV history fallback, only if KV diff is exactly 0)
    * No local fallback — guarantees all clients see identical deltas.
    */
   function getGhostPrev(c) {
     const trackKeyMap = {fuji:'fujimori', rla:'rla', nieto:'nieto', sanch:'sanchez', belm:'belmont'};
 
-    /* PRIORITY 1: KV prev_snapshot — most recent server-side reference */
+    /* PRIORITY 1: KV prev_snapshot — any non-zero diff is real and consistent across clients */
     if (_kvPrevCandidates) {
       const prev = _kvPrevCandidates[c.key] || 0;
-      if (prev > 0 && Math.abs(c.pct - prev) > 0.005) return prev;
+      if (prev > 0 && prev !== c.pct) return prev;
     }
 
-    /* PRIORITY 2: TRACKING.cuts — server-side KV history, walk backwards */
+    /* PRIORITY 2: TRACKING.cuts (fallback when KV == current exactly) */
     if (typeof TRACKING !== 'undefined' && TRACKING.cuts && TRACKING.cuts.length >= 2) {
       for (let i = TRACKING.cuts.length - 2; i >= 0; i--) {
         const cut = TRACKING.cuts[i];

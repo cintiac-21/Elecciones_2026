@@ -1306,12 +1306,18 @@ function highlightHotMover() {
 let _lastMoversSignature = '';
 let _moversAnimated = false; /* Slam fires once per page session */
 
-/* Staggered slam animation: label fades, then each badge slams 500ms apart */
+/* Staggered slam animation: uses double-rAF to ensure initial paint before animating.
+   Fixes mobile browsers that batch setTimeout(0) with DOM mutations. */
 function animateSlam(container) {
-  const lbl = container.querySelector('.rm-label');
-  if (lbl) setTimeout(() => lbl.classList.add('slam-label'), 0);
-  container.querySelectorAll('.region-mover.rm-up').forEach((el, i) => {
-    setTimeout(() => { el.classList.add('slam', 'slam-flash'); }, 500 + i * 500);
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const lbl = container.querySelector('.rm-label');
+      if (lbl) lbl.classList.add('slam-label');
+      container.querySelectorAll('.region-mover.rm-up').forEach((el, i) => {
+        el.style.animationDelay = (400 + i * 400) + 'ms';
+        el.classList.add('slam', 'slam-flash');
+      });
+    });
   });
 }
 
@@ -1366,7 +1372,19 @@ function showRegionMovers() {
   container.innerHTML = html;
   _moversAnimated = true;
 
-  animateSlam(container);
+  /* Trigger slam with requestAnimationFrame to ensure initial state (opacity:0)
+     has painted before animation starts — fixes mobile where setTimeout(0) can
+     batch with the innerHTML assignment, skipping the animation. */
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const lbl = container.querySelector('.rm-label');
+      if (lbl) lbl.classList.add('slam-label');
+      container.querySelectorAll('.region-mover.rm-up').forEach((el, i) => {
+        el.style.animationDelay = (400 + i * 400) + 'ms';
+        el.classList.add('slam', 'slam-flash');
+      });
+    });
+  });
 }
 
 /* Update national vote counters */

@@ -153,6 +153,7 @@
     .kpi-ghost-delta.up{color:#2ECDA7;background:rgba(46,205,167,0.12)}
     .kpi-ghost-delta.down{color:#E04848;background:rgba(224,72,72,0.12)}
     .kpi-ghost-delta.flat{color:var(--tx3);background:rgba(255,255,255,0.04)}
+    .kpi-votes{font-family:'DM Mono',monospace;font-size:10px;color:var(--tx3);margin-top:3px;opacity:.7;letter-spacing:.02em}
     .kpi-gap{font-family:'DM Mono',monospace;font-size:11px;color:#EF9F27;margin-top:4px;
       padding:3px 6px;background:rgba(239,159,39,.1);border-radius:4px;border:1px solid rgba(239,159,39,.2);
       display:inline-block;font-weight:600}
@@ -536,20 +537,14 @@
     }
     #yape-fab {
       position: fixed; top: 14px; left: 14px; z-index: 9999;
-      width: 46px; height: 46px; border: none; cursor: pointer;
-      background: none; padding: 0;
-      display: flex; align-items: center; justify-content: center;
+      width: 42px; height: 42px; border: none; cursor: pointer;
+      background: none; padding: 0; border-radius: 10px; overflow: hidden;
       transition: transform .2s ease, filter .2s ease; outline: none;
       filter: drop-shadow(0 3px 10px rgba(108,45,142,.55));
     }
     #yape-fab:hover { transform: scale(1.1); filter: drop-shadow(0 5px 16px rgba(108,45,142,.75)); }
     #yape-fab:active { transform: scale(.92); }
-    #yape-fab .fab-heart { position: absolute; inset: 0; }
-    #yape-fab .fab-letter {
-      position: relative; z-index: 1;
-      font-family: "BelgraviaModern", serif; font-size: 20px; color: #fff;
-      line-height: 1; margin-top: -2px; pointer-events: none; user-select: none;
-    }
+    #yape-fab img { width: 100%; height: 100%; display: block; object-fit: cover; }
     /* Heartbeat on page load — 3 pulses then stops */
     @keyframes yapeBeat {
       0%,100% { transform: scale(1); }
@@ -1075,6 +1070,14 @@ function renderKPIs(values) {
     return `<div class="kpi-gap">${approx ? '~' : ''}-${gapStr} vs ${i}°</div>`;
   }
 
+  /* Total valid votes per candidate — shown below the ghost line */
+  function voteTotalHtml(c) {
+    if (!values || !realVotes || !realVotes[c.key]) return '';
+    const v = realVotes[c.key];
+    const str = v.toLocaleString('es-PE');
+    return `<div class="kpi-votes">${str} votos</div>`;
+  }
+
   container.innerHTML = sorted.map((c, i) => {
     return `<div class="kpi" data-candidate="${c.key}" style="border-top:3px solid ${c.color}">
       <div class="kpi-header">
@@ -1083,6 +1086,7 @@ function renderKPIs(values) {
       </div>
       <div class="kpi-val" style="color:${c.color}"><span class="kpi-num" data-key="${c.key}">0.000%</span><span class="trend" data-trend-key="${c.trackKey}"></span></div>
       ${ghostHtml(c)}
+      ${voteTotalHtml(c)}
       ${voteGapHtml(c, i)}
     </div>`;
   }).join('');
@@ -2583,15 +2587,7 @@ if (WORKER_URL && !WORKER_URL.includes('TUSUBDOMINIO')) {
   </div>
 
   <button id="yape-fab" aria-label="Yapear" title="Yapear">
-    <svg class="fab-heart" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-      <defs><linearGradient id="hgr" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stop-color="#6C2D8E"/>
-        <stop offset="60%" stop-color="#8B3DBF"/>
-        <stop offset="100%" stop-color="#A64FCE"/>
-      </linearGradient></defs>
-      <path fill="url(#hgr)" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-    </svg>
-    <span class="fab-letter">Y</span>
+    <img src="img/yape-logo.png" alt="Yape" draggable="false">
   </button>
 
   <div id="yape-overlay"></div>

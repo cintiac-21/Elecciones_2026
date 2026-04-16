@@ -229,7 +229,7 @@
     .prob-section{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);
       padding:14px 18px;margin-bottom:16px;opacity:0;animation:fadeUp .5s ease .35s forwards}
     .prob-title{font-size:11px;font-weight:600;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px}
-    .prob-new{display:inline-block;font-size:9px;color:#E04848;font-weight:500;text-transform:none;letter-spacing:0;
+    .prob-new{display:inline-block;font-size:11px;color:#E04848;font-weight:500;text-transform:none;letter-spacing:0;
       border:1px solid rgba(224,72,72,.3);border-radius:4px;padding:1px 6px;margin-left:6px;vertical-align:middle}
     .prob-bars{display:flex;gap:16px;flex-wrap:wrap}
     .prob-item{flex:1;min-width:180px;display:flex;align-items:center;gap:8px}
@@ -560,7 +560,7 @@
 
     <!-- Probability of passing to second round -->
     <div class="prob-section">
-      <div class="prob-title">Probabilidad de pase a segunda vuelta <span class="prob-new">Incluye tendencia rural observada al ~80% +</span></div>
+      <div class="prob-title">Probabilidad de pase a segunda vuelta <span class="prob-new">Se enfría el impulso rural. Ganan peso las actas observadas.</span></div>
       <div class="prob-bars" id="probBars"></div>
     </div>
 
@@ -2014,6 +2014,7 @@ async function refreshFromONPE() {
    §9  MOTOR DE PROYECCIÓN
    Estima resultados finales a partir de la data regional parcial.
    Aplica factores de ajuste rural por nivel de conteo.
+   El boost de Sánchez solo se aplica a actas pendientes puras, no a JEE.
    — Renzo Núñez Berdejo
 ══════════════════════════════════════════════════════════ */
 function runProjection(regions) {
@@ -2076,15 +2077,25 @@ function runProjection(regions) {
       const totalEstVV = Math.round(pctF * estObserved + (1 - pctF) * estHistorical);
       vvPend = Math.max(0, totalEstVV - r.vv);
     } else if (r.totalActas && r.contabilizadas && r.contabilizadas > 0) {
-      /* Exact method for domestic: integer acta counts from ONPE API */
+      /* Exact method for domestic: split pure pending actas vs JEE.
+         Sánchez boost applies ONLY to pure pending actas.
+         JEE is treated as neutral for Sánchez because its composition is a black box. */
       const avgVVperActa = r.vv / r.contabilizadas;
       const jee = r.enviadasJee || 0;
-      const actasPuras = r.totalActas - r.contabilizadas - jee;
-      vvPend = actasPuras * avgVVperActa + jee * avgVVperActa * 0.85;
+      const actasPuras = Math.max(0, r.totalActas - r.contabilizadas - jee);
+      const vvPuras = actasPuras * avgVVperActa;
+      const vvJee = jee * avgVVperActa * 0.85;
+      vvPend = vvPuras + vvJee;
+      r._projAvgVV = avgVVperActa;
+      r._projVvPuras = vvPuras;
+      r._projVvJee = vvJee;
     } else {
       /* Fallback: estimate from rounded percentage */
       const vvTotal = r.vv / (r.pct / 100);
       vvPend = vvTotal - r.vv;
+      r._projAvgVV = 0;
+      r._projVvPuras = vvPend;
+      r._projVvJee = 0;
     }
 
     /* Look up empirical factors for this department */
@@ -2096,15 +2107,27 @@ function runProjection(regions) {
     /* Dampen: blend empirical with baseline. Order: [fuji, rla, nieto, belm, sanch] */
     const rlaF = 1.0 + (ef.r - 1.0) * DAMP;
     const sanF = 1.0 + (ef.s - 1.0) * DAMP;
-    const factors = [1.0, rlaF, 1.0, 1.0, sanF];
 
     const pcts = [r.fuji, r.rla, r.nieto, r.belm, r.sanch];
     const votos = pcts.map(p => (r.vv * p / 100));
 
     KEYS.forEach((k, i) => {
       totActual[i] += votos[i];
-      totPend[i] += vvPend * (pcts[i] / 100) * factors[i];
     });
+
+    const vvPuras = r._projVvPuras || 0;
+    const vvJee = r._projVvJee || 0;
+
+    /* Neutral for all candidates by default */
+    totPend[0] += vvPend * (pcts[0] / 100);                /* Fujimori */
+    totPend[2] += vvPend * (pcts[2] / 100);                /* Nieto */
+    totPend[3] += vvPend * (pcts[3] / 100);                /* Belmont */
+
+    /* RLA keeps regional empirical factor across remaining actas */
+    totPend[1] += vvPend * (pcts[1] / 100) * rlaF;
+
+    /* Sánchez boost only survives in pure pending actas, not in JEE */
+    totPend[4] += vvPuras * (pcts[4] / 100) * sanF + vvJee * (pcts[4] / 100);
     totalVV += r.vv;
   });
 

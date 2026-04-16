@@ -357,8 +357,9 @@
       .kpi-label{font-size:9px}
       .kpi-avatar{width:26px;height:26px}
 
-      /* Region movers: when inside .kpis grid, span full width (appears below hot card) */
-      .kpis .region-movers{grid-column:1/-1;margin:0;padding:6px 4px}
+      /* Region movers: show ABOVE all KPIs on mobile for visibility */
+      #tab-onpe{display:flex;flex-direction:column}
+      #regionMovers{order:-1;margin-bottom:8px}
 
       /* Probability bars: vertical stack */
       .prob-section{padding:10px 12px}
@@ -1162,16 +1163,6 @@ function showRegionMovers() {
         <span class="rm-delta">${votesStr}</span>
       </span>`;
     }).join('');
-
-  /* Position: on mobile (≤600px), insert container INSIDE kpis grid right after
-     the hot candidate card, spanning full width. On desktop, keep it below kpis. */
-  const hotCard = document.querySelector(`.kpi[data-candidate="${fieldKey}"]`);
-  const kpisContainer = document.getElementById('kpiCandidates');
-  if (window.innerWidth <= 600 && hotCard && kpisContainer) {
-    hotCard.insertAdjacentElement('afterend', container);
-  } else if (kpisContainer && container.parentElement !== kpisContainer.parentElement) {
-    kpisContainer.insertAdjacentElement('afterend', container);
-  }
 
   /* Staggered slam: label fades in, then each badge slams 500ms apart */
   setTimeout(() => { const el = document.getElementById('_rmL'); if (el) el.classList.add('slam-label'); }, 0);

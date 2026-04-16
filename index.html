@@ -491,19 +491,31 @@
     }
     #yape-fab {
       position: fixed; top: 14px; left: 14px; z-index: 9999;
-      width: 44px; height: 44px; border-radius: 50%;
-      background: linear-gradient(135deg, #6C2D8E 0%, #8B3DBF 60%, #A64FCE 100%);
-      box-shadow: 0 3px 14px rgba(108,45,142,.55);
-      border: none; cursor: pointer;
+      width: 46px; height: 46px; border: none; cursor: pointer;
+      background: none; padding: 0;
       display: flex; align-items: center; justify-content: center;
-      transition: transform .2s ease, box-shadow .2s ease; outline: none;
+      transition: transform .2s ease, filter .2s ease; outline: none;
+      filter: drop-shadow(0 3px 10px rgba(108,45,142,.55));
     }
-    #yape-fab:hover { transform: scale(1.08); box-shadow: 0 5px 20px rgba(108,45,142,.75); }
-    #yape-fab:active { transform: scale(.95); }
-    #yape-fab span {
-      font-family: "BelgraviaModern", serif; font-size: 26px; color: #fff;
-      line-height: 1; margin-top: 2px; pointer-events: none; user-select: none;
+    #yape-fab:hover { transform: scale(1.1); filter: drop-shadow(0 5px 16px rgba(108,45,142,.75)); }
+    #yape-fab:active { transform: scale(.92); }
+    #yape-fab .fab-heart { position: absolute; inset: 0; }
+    #yape-fab .fab-letter {
+      position: relative; z-index: 1;
+      font-family: "BelgraviaModern", serif; font-size: 20px; color: #fff;
+      line-height: 1; margin-top: -2px; pointer-events: none; user-select: none;
     }
+    /* Heartbeat on page load — 3 pulses then stops */
+    @keyframes yapeBeat {
+      0%,100% { transform: scale(1); }
+      14% { transform: scale(1.25); }
+      28% { transform: scale(1); }
+      42% { transform: scale(1.2); }
+      56% { transform: scale(1); }
+      70% { transform: scale(1.15); }
+      84% { transform: scale(1); }
+    }
+    #yape-fab { animation: yapeBeat 2s ease-in-out 1s 1 both; }
     #yape-overlay {
       position: fixed; inset: 0; z-index: 9998;
       background: rgba(0,0,0,.45); backdrop-filter: blur(3px);
@@ -600,7 +612,7 @@
         <span id="lastUpdate">Consultando ONPE en vivo...</span>
       </div>
       <div class="hero-onpe-ts" id="onpeLastUpdate"></div>
-      <div class="hero-version">v3.7.2</div>
+      <div class="hero-version">v3.8.0</div>
     </div>
     <div class="hero-right">
       <button class="refresh-btn" id="refreshBtn" onclick="refreshFromONPE()">
@@ -2484,7 +2496,15 @@ if (WORKER_URL && !WORKER_URL.includes('TUSUBDOMINIO')) {
 
   <!-- ═══════════ YAPE FLOATING WIDGET ═══════════ -->
   <button id="yape-fab" aria-label="Yapear" title="Yapear">
-    <span>Y</span>
+    <svg class="fab-heart" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <defs><linearGradient id="hgr" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#6C2D8E"/>
+        <stop offset="60%" stop-color="#8B3DBF"/>
+        <stop offset="100%" stop-color="#A64FCE"/>
+      </linearGradient></defs>
+      <path fill="url(#hgr)" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+    </svg>
+    <span class="fab-letter">Y</span>
   </button>
 
   <div id="yape-overlay"></div>

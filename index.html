@@ -1103,13 +1103,13 @@ function highlightHotMover() {
   }, 3800);
 }
 
-/* Show top 3 regions driving the hot-mover candidate's latest change */
+/* Show top 3 regions driving the hot-mover candidate's latest change.
+   Preserves last valid render when no new movers exist (ONPE didn't advance). */
+let _lastMoversSignature = '';
+
 function showRegionMovers() {
   const container = document.getElementById('regionMovers');
-  if (!container || !_prevRegions || _prevRegions.length === 0) {
-    if (container) container.innerHTML = '';
-    return;
-  }
+  if (!container || !_prevRegions || _prevRegions.length === 0) return;
 
   /* Find the hot-mover candidate (same logic as highlightHotMover) */
   const trackToField = {fujimori:'fuji', rla:'rla', nieto:'nieto', sanchez:'sanch', belmont:'belm'};
@@ -1117,7 +1117,8 @@ function showRegionMovers() {
   Object.entries(_ghostDeltas).forEach(([tk, delta]) => {
     if (delta > maxDelta) { maxDelta = delta; hotTrackKey = tk; }
   });
-  if (!hotTrackKey || maxDelta <= 0) { container.innerHTML = ''; return; }
+  /* No hot mover → keep previous render (don't clear) */
+  if (!hotTrackKey || maxDelta <= 0) return;
 
   const fieldKey = trackToField[hotTrackKey] || hotTrackKey;
   const candConfig = CANDIDATE_CONFIG.find(c => c.trackKey === hotTrackKey);
@@ -1148,7 +1149,13 @@ function showRegionMovers() {
   contributions.sort((a, b) => b.delta - a.delta);
   const top3 = contributions.slice(0, 3);
 
-  if (top3.length === 0) { container.innerHTML = ''; return; }
+  /* No positive regions for hot-mover → keep previous render (don't clear) */
+  if (top3.length === 0) return;
+
+  /* Signature check: if same candidate + same regions + same deltas, skip re-animation */
+  const signature = hotTrackKey + '|' + top3.map(r => r.name + ':' + Math.round(r.delta)).join(',');
+  if (signature === _lastMoversSignature) return;
+  _lastMoversSignature = signature;
 
   /* Render elements hidden, then slam each one with staggered setTimeout */
   const fireSvg = '<svg width="13" height="13" viewBox="0 0 24 24" fill="#EF9F27" style="vertical-align:-2px;margin-right:2px"><path d="M12 23c-3.9 0-7-3.1-7-7 0-2.1 1.1-4.5 2.5-6.4C9.2 7.5 11 5.5 12 2c1 3.5 2.8 5.5 4.5 7.6C17.9 11.5 19 13.9 19 16c0 3.9-3.1 7-7 7z"/></svg>';

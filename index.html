@@ -2126,8 +2126,12 @@ function runProjection(regions) {
     /* RLA keeps regional empirical factor across remaining actas */
     totPend[1] += vvPend * (pcts[1] / 100) * rlaF;
 
-    /* Sánchez boost only survives in pure pending actas, not in JEE */
-    totPend[4] += vvPuras * (pcts[4] / 100) * sanF + vvJee * (pcts[4] / 100);
+    /* Sánchez boost fades smoothly as pure pending actas shrink vs JEE.
+       When pure pending dominates, sanEff stays close to sanF.
+       When JEE dominates, sanEff cools toward 1.0 without a hard cut. */
+    const pureShare = (vvPuras + vvJee) > 0 ? (vvPuras / (vvPuras + vvJee)) : 0;
+    const sanEff = 1.0 + (sanF - 1.0) * Math.sqrt(pureShare);
+    totPend[4] += vvPend * (pcts[4] / 100) * sanEff;
     totalVV += r.vv;
   });
 

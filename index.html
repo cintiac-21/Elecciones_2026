@@ -149,6 +149,23 @@
       50%{transform:scale(1.08);box-shadow:0 0 10px 3px rgba(239,159,39,.3)}
     }
 
+    /* Region movers — shows which regions drove the latest movement */
+    .region-movers{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;
+      min-height:0;padding:0;transition:all .4s ease}
+    .region-movers:empty{display:none}
+    .region-mover{display:inline-flex;align-items:center;gap:4px;font-family:'DM Mono',monospace;
+      font-size:10px;padding:3px 8px;border-radius:4px;opacity:0;transform:translateY(-8px);
+      animation:moverReveal .5s ease forwards}
+    .region-mover .rm-name{font-weight:600;color:var(--tx1)}
+    .region-mover .rm-delta{font-weight:500}
+    .region-mover.rm-up{background:rgba(46,205,167,.08);border:1px solid rgba(46,205,167,.15);color:#2ECDA7}
+    .region-mover.rm-down{background:rgba(224,72,72,.08);border:1px solid rgba(224,72,72,.15);color:#E04848}
+    .region-mover .rm-icon{font-size:11px}
+    @keyframes moverReveal{
+      0%{opacity:0;transform:translateY(-8px)}
+      100%{opacity:1;transform:translateY(0)}
+    }
+
     /* ══════════════ 5a. TREND ARROWS ══════════════ */
     .trend{display:inline-flex;flex-direction:row;gap:0;margin-left:4px;vertical-align:middle}
     .trend svg{width:10px;height:10px;margin:0 -1px;filter:drop-shadow(0 0 2px currentColor)}
@@ -485,6 +502,9 @@
     <!-- KPIs: Top 5 candidates (rendered dynamically, sorted by %) -->
     <div class="kpis" id="kpiCandidates"></div>
 
+    <!-- Region movers: top 3 regions driving the latest change -->
+    <div class="region-movers" id="regionMovers"></div>
+
     <!-- Probability of passing to second round -->
     <div class="prob-section">
       <div class="prob-title">Probabilidad de pase a segunda vuelta <span class="prob-new">Incluye tendencia rural observada al ~80% +</span></div>
@@ -748,6 +768,8 @@ let topoData = null;
 let _prevKpiValues = null;
 /* Ghost deltas — shared with updateTrendArrows for consistency */
 let _ghostDeltas = {}; /* {fuji: -0.031, rla: -0.125, ...} */
+/* Previous region snapshot — loaded from Worker KV (server-side, same for all clients) */
+let _prevRegions = null;
 
 /* Timing constants for reveal sequence */
 const KPI_STAGGER_MS = 280;  /* Delay between each card reveal */
@@ -1058,6 +1080,63 @@ function highlightHotMover() {
       }
     }
   }, 3800);
+}
+
+/* Show top 3 regions driving the hot-mover candidate's latest change */
+function showRegionMovers() {
+  const container = document.getElementById('regionMovers');
+  if (!container || !_prevRegions || _prevRegions.length === 0) {
+    if (container) container.innerHTML = '';
+    return;
+  }
+
+  /* Find the hot-mover candidate (same logic as highlightHotMover) */
+  const trackToField = {fujimori:'fuji', rla:'rla', nieto:'nieto', sanchez:'sanch', belmont:'belm'};
+  let maxDelta = 0, hotTrackKey = null;
+  Object.entries(_ghostDeltas).forEach(([tk, delta]) => {
+    if (delta > maxDelta) { maxDelta = delta; hotTrackKey = tk; }
+  });
+  if (!hotTrackKey || maxDelta <= 0) { container.innerHTML = ''; return; }
+
+  const fieldKey = trackToField[hotTrackKey] || hotTrackKey;
+  const candConfig = CANDIDATE_CONFIG.find(c => c.trackKey === hotTrackKey);
+  const candLabel = candConfig ? candConfig.short : hotTrackKey;
+
+  /* Calculate per-region vote contribution for this candidate */
+  const contributions = [];
+  ONPE_REGIONS.forEach(curr => {
+    const prev = _prevRegions.find(p => p.name === curr.name);
+    if (!prev || !curr.vv || !prev.vv) return;
+    const votesCurr = curr.vv * (curr[fieldKey] || 0) / 100;
+    const votesPrev = prev.vv * (prev[fieldKey] || 0) / 100;
+    const delta = votesCurr - votesPrev;
+    if (Math.abs(delta) > 5) { /* Ignore noise < 5 votes */
+      contributions.push({ name: curr.name, delta: delta });
+    }
+  });
+
+  /* Sort by absolute contribution, take top 3 */
+  contributions.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+  const top3 = contributions.slice(0, 3);
+
+  if (top3.length === 0) { container.innerHTML = ''; return; }
+
+  /* Render with staggered animation */
+  const label = maxDelta > 0 ? '▲ ' + candLabel : '▼ ' + candLabel;
+  container.innerHTML =
+    `<span class="region-mover rm-label" style="animation-delay:0s;background:none;border:none;color:var(--tx2);font-size:10px;padding:3px 4px;font-weight:600"><svg width="12" height="12" viewBox="0 0 24 24" fill="#EF9F27" style="vertical-align:-1px;margin-right:2px"><path d="M12 23c-3.9 0-7-3.1-7-7 0-2.1 1.1-4.5 2.5-6.4C9.2 7.5 11 5.5 12 2c1 3.5 2.8 5.5 4.5 7.6C17.9 11.5 19 13.9 19 16c0 3.9-3.1 7-7 7z"/></svg>Top Movers ${candLabel}:</span>` +
+    top3.map((r, i) => {
+      const isUp = r.delta > 0;
+      const cls = isUp ? 'rm-up' : 'rm-down';
+      const sign = isUp ? '+' : '';
+      const votesStr = Math.abs(r.delta) >= 1000
+        ? sign + (r.delta / 1000).toFixed(1) + 'k'
+        : sign + Math.round(r.delta);
+      return `<span class="region-mover ${cls}" style="animation-delay:${(i + 1) * 0.15}s">
+        <span class="rm-name">${r.name}</span>
+        <span class="rm-delta">${votesStr}</span>
+      </span>`;
+    }).join('');
 }
 
 /* Update national vote counters */
@@ -1721,6 +1800,20 @@ async function refreshFromONPE() {
   setStatus('Consultando ONPE...', '');
 
   try {
+    /* Load previous snapshot from KV — server-side, same for ALL clients.
+       This is the snapshot the Worker saved BEFORE the current one. */
+    if (WORKER_URL) {
+      try {
+        const prevResp = await fetch(WORKER_URL + '/api/prev-snapshot');
+        if (prevResp.ok) {
+          const prevData = await prevResp.json();
+          if (prevData.regions && prevData.regions.length >= 26) {
+            _prevRegions = prevData.regions;
+          }
+        }
+      } catch(e) { /* Non-critical */ }
+    }
+
     /* ═══ TWO calls to get everything (free tier: max 50 subrequests each) ═══ */
     setStatus('Obteniendo data (1/2)...', '');
     const resp1 = await fetch(WORKER_URL + '/api/snapshot?half=1');
@@ -1763,7 +1856,7 @@ async function refreshFromONPE() {
     /* If natPct < lastCut.pct, ignore (ONPE counter went backward, JEE noise) */
     /* Note: highlightHotMover moved after renderKPIs below */
 
-    /* 3. Update regions */
+    /* 3. Update regions (prev snapshot comes from KV, not client-side) */
     ONPE_REGIONS.length = 0;
     allRegions.forEach(r => ONPE_REGIONS.push(r));
 
@@ -1792,6 +1885,8 @@ async function refreshFromONPE() {
     setTimeout(() => {
       updateTrendArrows();
       highlightHotMover();
+      /* Region movers appear 1.5s after hot-mover starts */
+      setTimeout(() => showRegionMovers(), 1500);
     }, refreshRevealMs + 400);
     const cacheStatus = resp1.headers.get('X-Cache') || '';
     const cacheAge = resp1.headers.get('X-Cache-Age') || '';

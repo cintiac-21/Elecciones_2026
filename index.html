@@ -156,6 +156,26 @@
     .region-movers{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;
       min-height:0;padding:4px 0;transition:all .4s ease}
     .region-movers:empty{display:none}
+
+    /* Stale banner — pulsing warning shown above KPIs when ONPE data is >30min old.
+       Hidden by default; toggled via .visible class from JS based on _serverDerived.stale */
+    .stale-banner{display:none;align-items:center;justify-content:center;gap:10px;
+      margin:0 auto 14px;padding:10px 20px;width:max-content;max-width:calc(100% - 32px);
+      background:rgba(232,148,58,0.08);border:1px solid rgba(232,148,58,0.35);
+      border-radius:10px;font-size:13px;font-weight:600;color:var(--c-fuji);
+      letter-spacing:0.01em;animation:staleGlow 2.4s ease-in-out infinite}
+    .stale-banner.visible{display:flex}
+    .stale-dot{width:9px;height:9px;border-radius:50%;background:var(--c-fuji);
+      animation:staleDotPulse 1.6s ease-in-out infinite;box-shadow:0 0 0 0 rgba(232,148,58,0.5)}
+    .stale-text{line-height:1}
+    @keyframes staleGlow{
+      0%,100%{box-shadow:0 0 0 0 rgba(232,148,58,0), 0 0 12px rgba(232,148,58,0.08)}
+      50%{box-shadow:0 0 0 4px rgba(232,148,58,0), 0 0 20px rgba(232,148,58,0.22)}
+    }
+    @keyframes staleDotPulse{
+      0%,100%{box-shadow:0 0 0 0 rgba(232,148,58,0.55);opacity:1}
+      50%{box-shadow:0 0 0 8px rgba(232,148,58,0);opacity:0.6}
+    }
     .region-mover{display:inline-flex;align-items:center;gap:4px;font-family:'DM Mono',monospace;
       font-size:11px;padding:4px 10px;border-radius:5px;opacity:0;transform:scale(0) translateY(-30px);
       position:relative;white-space:nowrap}
@@ -483,7 +503,7 @@
         <span id="lastUpdate">Consultando ONPE en vivo...</span>
       </div>
       <div class="hero-onpe-ts" id="onpeLastUpdate"></div>
-      <div class="hero-version">v3.6.2</div>
+      <div class="hero-version">v3.7.1</div>
     </div>
     <div class="hero-right">
       <button class="refresh-btn" id="refreshBtn" onclick="refreshFromONPE()">
@@ -526,6 +546,12 @@
        TAB 1: ONPE EN VIVO
   ══════════════════════════════════════════════ -->
   <div class="tab-content active" id="tab-onpe">
+    <!-- Stale data banner: shown when ONPE hasn't updated in >30min -->
+    <div class="stale-banner" id="staleBanner">
+      <span class="stale-dot"></span>
+      <span class="stale-text">Esperando actualizaciones de la ONPE</span>
+    </div>
+
     <!-- KPIs: Top 5 candidates (rendered dynamically, sorted by %) -->
     <div class="kpis" id="kpiCandidates"></div>
 
@@ -1105,12 +1131,12 @@ function showRegionMovers() {
 
   const boost = _serverDerived?.boost;
 
-  /* No boost data from server — keep cached DOM from localStorage if present */
+  /* No boost from server — clear any previous DOM so state reflects server truth.
+     Happens when ONPE data is stale (>30min) or no boost has been computed yet. */
   if (!boost || !boost.regions || boost.regions.length === 0) {
-    if (!_moversAnimated && container.children.length > 0) {
-      animateSlam(container);
-      _moversAnimated = true;
-    }
+    container.innerHTML = '';
+    _lastMoversSignature = '';
+    _moversAnimated = false;
     return;
   }
 
@@ -1937,6 +1963,12 @@ async function refreshFromONPE() {
       } else {
         onpeEl.textContent = '';
       }
+    }
+
+    /* 6c. Toggle stale banner — shown when server flags data as >30min old */
+    const staleBanner = document.getElementById('staleBanner');
+    if (staleBanner) {
+      staleBanner.classList.toggle('visible', _serverDerived?.stale === true);
     }
 
     /* 7. Re-render */

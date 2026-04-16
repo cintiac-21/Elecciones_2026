@@ -479,7 +479,7 @@
         <span class="live-dot"></span>
         <span id="lastUpdate">Consultando ONPE en vivo...</span>
       </div>
-      <div class="hero-version">v3.3.4</div>
+      <div class="hero-version">v3.3.5</div>
     </div>
     <div class="hero-right">
       <button class="refresh-btn" id="refreshBtn" onclick="refreshFromONPE()">
@@ -1108,8 +1108,18 @@ function highlightHotMover() {
 /* Show top 3 regions driving the hot-mover candidate's latest change.
    Preserves last valid render across refreshes via localStorage. */
 let _lastMoversSignature = '';
+let _moversAnimated = false; /* Slam fires once per page session */
 
-/* Restore last render from localStorage on page load — before function runs */
+/* Staggered slam animation: label fades, then each badge slams 500ms apart */
+function animateSlam(container) {
+  const lbl = container.querySelector('.rm-label');
+  if (lbl) setTimeout(() => lbl.classList.add('slam-label'), 0);
+  container.querySelectorAll('.region-mover.rm-up').forEach((el, i) => {
+    setTimeout(() => { el.classList.add('slam', 'slam-flash'); }, 500 + i * 500);
+  });
+}
+
+/* Restore last render from localStorage on page load — HTML only, animate later */
 function restoreMoversFromCache() {
   try {
     const cached = localStorage.getItem('lastMovers');
@@ -1119,12 +1129,8 @@ function restoreMoversFromCache() {
       if (container && data.html) {
         container.innerHTML = data.html;
         _lastMoversSignature = data.signature || '';
-        /* Re-apply animation classes immediately (no slam on restore) */
-        const lbl = document.getElementById('_rmL');
-        if (lbl) { lbl.style.opacity = '1'; lbl.style.transform = 'none'; }
-        container.querySelectorAll('.region-mover.rm-up').forEach(el => {
-          el.style.opacity = '1'; el.style.transform = 'none';
-        });
+        /* DOM is injected but elements stay invisible (CSS default opacity:0).
+           showRegionMovers() will trigger the slam when it runs. */
       }
     }
   } catch(e) {}
@@ -1132,7 +1138,14 @@ function restoreMoversFromCache() {
 
 function showRegionMovers() {
   const container = document.getElementById('regionMovers');
-  if (!container || !_prevRegions || _prevRegions.length === 0) return;
+  if (!container || !_prevRegions || _prevRegions.length === 0) {
+    /* No prev data available — if we have cached DOM, slam it anyway */
+    if (container && !_moversAnimated && container.children.length > 0) {
+      animateSlam(container);
+      _moversAnimated = true;
+    }
+    return;
+  }
 
   /* Find the hot-mover candidate (same logic as highlightHotMover) */
   const trackToField = {fujimori:'fuji', rla:'rla', nieto:'nieto', sanchez:'sanch', belmont:'belm'};
@@ -1140,8 +1153,14 @@ function showRegionMovers() {
   Object.entries(_ghostDeltas).forEach(([tk, delta]) => {
     if (delta > maxDelta) { maxDelta = delta; hotTrackKey = tk; }
   });
-  /* No hot mover → keep previous render (don't clear) */
-  if (!hotTrackKey || maxDelta <= 0) return;
+  /* No hot mover → keep previous render, but slam cached content if not yet animated */
+  if (!hotTrackKey || maxDelta <= 0) {
+    if (!_moversAnimated && container.children.length > 0) {
+      animateSlam(container);
+      _moversAnimated = true;
+    }
+    return;
+  }
 
   const fieldKey = trackToField[hotTrackKey] || hotTrackKey;
   const candConfig = CANDIDATE_CONFIG.find(c => c.trackKey === hotTrackKey);
@@ -1172,15 +1191,27 @@ function showRegionMovers() {
   contributions.sort((a, b) => b.delta - a.delta);
   const top3 = contributions.slice(0, 3);
 
-  /* No positive regions for hot-mover → keep previous render (don't clear) */
-  if (top3.length === 0) return;
+  /* No positive regions for hot-mover → slam cached content if not yet animated */
+  if (top3.length === 0) {
+    if (!_moversAnimated && container.children.length > 0) {
+      animateSlam(container);
+      _moversAnimated = true;
+    }
+    return;
+  }
 
-  /* Signature check: if same candidate + same regions + same deltas, skip re-animation */
+  /* Signature check: if same candidate + same regions + same deltas, just slam cached */
   const signature = hotTrackKey + '|' + top3.map(r => r.name + ':' + Math.round(r.delta)).join(',');
-  if (signature === _lastMoversSignature) return;
+  if (signature === _lastMoversSignature) {
+    if (!_moversAnimated && container.children.length > 0) {
+      animateSlam(container);
+      _moversAnimated = true;
+    }
+    return;
+  }
   _lastMoversSignature = signature;
 
-  /* Render elements hidden, then slam each one with staggered setTimeout */
+  /* New data — render fresh and slam */
   const fireSvg = '<svg width="13" height="13" viewBox="0 0 24 24" fill="#EF9F27" style="vertical-align:-2px;margin-right:2px"><path d="M12 23c-3.9 0-7-3.1-7-7 0-2.1 1.1-4.5 2.5-6.4C9.2 7.5 11 5.5 12 2c1 3.5 2.8 5.5 4.5 7.6C17.9 11.5 19 13.9 19 16c0 3.9-3.1 7-7 7z"/></svg>';
   const html =
     `<span class="region-mover rm-label" id="_rmL">${fireSvg}Boost para ${candLabel} desde:</span>` +
@@ -1195,6 +1226,7 @@ function showRegionMovers() {
     }).join('');
 
   container.innerHTML = html;
+  _moversAnimated = true;
 
   /* Persist to localStorage — survives F5 and across tabs */
   try {
@@ -1202,6 +1234,8 @@ function showRegionMovers() {
       html: html, signature: signature, ts: Date.now()
     }));
   } catch(e) {}
+
+  animateSlam(container);
 
   /* Staggered slam: label fades in, then each badge slams 500ms apart */
   setTimeout(() => { const el = document.getElementById('_rmL'); if (el) el.classList.add('slam-label'); }, 0);

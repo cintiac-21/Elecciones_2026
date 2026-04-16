@@ -479,7 +479,7 @@
         <span class="live-dot"></span>
         <span id="lastUpdate">Consultando ONPE en vivo...</span>
       </div>
-      <div class="hero-version">v3.3.1</div>
+      <div class="hero-version">v3.3.4</div>
     </div>
     <div class="hero-right">
       <button class="refresh-btn" id="refreshBtn" onclick="refreshFromONPE()">
@@ -1106,8 +1106,29 @@ function highlightHotMover() {
 }
 
 /* Show top 3 regions driving the hot-mover candidate's latest change.
-   Preserves last valid render when no new movers exist (ONPE didn't advance). */
+   Preserves last valid render across refreshes via localStorage. */
 let _lastMoversSignature = '';
+
+/* Restore last render from localStorage on page load — before function runs */
+function restoreMoversFromCache() {
+  try {
+    const cached = localStorage.getItem('lastMovers');
+    if (cached) {
+      const data = JSON.parse(cached);
+      const container = document.getElementById('regionMovers');
+      if (container && data.html) {
+        container.innerHTML = data.html;
+        _lastMoversSignature = data.signature || '';
+        /* Re-apply animation classes immediately (no slam on restore) */
+        const lbl = document.getElementById('_rmL');
+        if (lbl) { lbl.style.opacity = '1'; lbl.style.transform = 'none'; }
+        container.querySelectorAll('.region-mover.rm-up').forEach(el => {
+          el.style.opacity = '1'; el.style.transform = 'none';
+        });
+      }
+    }
+  } catch(e) {}
+}
 
 function showRegionMovers() {
   const container = document.getElementById('regionMovers');
@@ -1161,7 +1182,7 @@ function showRegionMovers() {
 
   /* Render elements hidden, then slam each one with staggered setTimeout */
   const fireSvg = '<svg width="13" height="13" viewBox="0 0 24 24" fill="#EF9F27" style="vertical-align:-2px;margin-right:2px"><path d="M12 23c-3.9 0-7-3.1-7-7 0-2.1 1.1-4.5 2.5-6.4C9.2 7.5 11 5.5 12 2c1 3.5 2.8 5.5 4.5 7.6C17.9 11.5 19 13.9 19 16c0 3.9-3.1 7-7 7z"/></svg>';
-  container.innerHTML =
+  const html =
     `<span class="region-mover rm-label" id="_rmL">${fireSvg}Boost para ${candLabel} desde:</span>` +
     top3.map((r, i) => {
       const votesStr = r.delta >= 1000
@@ -1172,6 +1193,15 @@ function showRegionMovers() {
         <span class="rm-delta">${votesStr}</span>
       </span>`;
     }).join('');
+
+  container.innerHTML = html;
+
+  /* Persist to localStorage — survives F5 and across tabs */
+  try {
+    localStorage.setItem('lastMovers', JSON.stringify({
+      html: html, signature: signature, ts: Date.now()
+    }));
+  } catch(e) {}
 
   /* Staggered slam: label fades in, then each badge slams 500ms apart */
   setTimeout(() => { const el = document.getElementById('_rmL'); if (el) el.classList.add('slam-label'); }, 0);
@@ -1232,6 +1262,9 @@ function showHeroFallback() {
 
   /* 1. Render everything with embedded data NOW */
   await renderWithEmbeddedData();
+
+  /* Restore last region movers from localStorage immediately (no wait) */
+  restoreMoversFromCache();
 
   /* 2. If Worker configured, refresh in background (will overwrite embedded data) */
   if (WORKER_URL && !WORKER_URL.includes('TUSUBDOMINIO')) {

@@ -549,6 +549,11 @@
     .yape-header-text p {
       margin: 2px 0 0; font-size: 11px; color: rgba(255,255,255,.72);
     }
+    .yape-disclaimer {
+      margin: 6px 0 0 !important; font-size: 8.5px !important;
+      color: rgba(255,255,255,.4) !important; line-height: 1.3;
+      font-style: italic; max-width: 200px;
+    }
     .yape-body {
       padding: 20px 20px 24px;
       display: flex; flex-direction: column; align-items: center; gap: 16px;
@@ -612,7 +617,7 @@
         <span id="lastUpdate">Consultando ONPE en vivo...</span>
       </div>
       <div class="hero-onpe-ts" id="onpeLastUpdate"></div>
-      <div class="hero-version">v3.8.0</div>
+      <div class="hero-version">v3.8.1</div>
     </div>
     <div class="hero-right">
       <button class="refresh-btn" id="refreshBtn" onclick="refreshFromONPE()">
@@ -2515,6 +2520,7 @@ if (WORKER_URL && !WORKER_URL.includes('TUSUBDOMINIO')) {
       <div class="yape-header-text">
         <h2>Yapear</h2>
         <p>🤍 Si te gustó este proyecto 🤍</p>
+        <p class="yape-disclaimer">Disclaimer: Este es un proyecto académico sin afiliación política ni fines de lucro. Cualquier donación es voluntaria.</p>
       </div>
       <button class="yape-close" id="yape-close-btn" aria-label="Cerrar">✕</button>
     </div>

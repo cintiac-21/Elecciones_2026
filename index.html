@@ -479,7 +479,7 @@
         <span class="live-dot"></span>
         <span id="lastUpdate">Consultando ONPE en vivo...</span>
       </div>
-      <div class="hero-version">v3.3.5</div>
+      <div class="hero-version">v3.4.0</div>
     </div>
     <div class="hero-right">
       <button class="refresh-btn" id="refreshBtn" onclick="refreshFromONPE()">
@@ -793,6 +793,8 @@ let _prevKpiValues = null;
 let _ghostDeltas = {}; /* {fuji: -0.031, rla: -0.125, ...} */
 /* Previous region snapshot — loaded from Worker KV (server-side, same for all clients) */
 let _prevRegions = null;
+/* KV-based previous national candidates — same for all clients, canonical ghost baseline */
+let _kvPrevCandidates = null;
 
 /* Timing constants for reveal sequence */
 const KPI_STAGGER_MS = 280;  /* Delay between each card reveal */
@@ -816,24 +818,28 @@ function renderKPIs(values) {
   })).sort((a, b) => b.pct - a.pct);
 
   /*
-   * Ghost comparison: finds the most meaningful previous value to compare.
-   * Handles race condition where background refresh returns near-identical
-   * data to embedded, producing ~0 delta. Falls through to TRACKING if needed.
+   * Ghost baseline priority:
+   * 1. _kvPrevCandidates (server-side, consistent across all clients)
+   * 2. _prevKpiValues (local session previous)
+   * 3. TRACKING.cuts (local history fallback)
    */
   function getGhostPrev(c) {
     const trackKeyMap = {fuji:'fujimori', rla:'rla', nieto:'nieto', sanch:'sanchez', belm:'belmont'};
 
-    /* Try _prevKpiValues first (from previous refresh cycle) */
-    if (_prevKpiValues) {
-      const prev = _prevKpiValues[c.key] || _prevKpiValues[c.trackKey] || 0;
-      /* Only use it if delta is meaningful (> 0.005pp) — otherwise
-         it's likely the same data from a race condition */
+    /* PRIORITY 1: KV prev candidates — same for all clients, canonical baseline */
+    if (_kvPrevCandidates) {
+      const prev = _kvPrevCandidates[c.key] || 0;
       if (prev > 0 && Math.abs(c.pct - prev) > 0.005) return prev;
     }
 
-    /* Fall back to TRACKING: find a cut with meaningful difference */
+    /* PRIORITY 2: local _prevKpiValues (previous refresh in same session) */
+    if (_prevKpiValues) {
+      const prev = _prevKpiValues[c.key] || _prevKpiValues[c.trackKey] || 0;
+      if (prev > 0 && Math.abs(c.pct - prev) > 0.005) return prev;
+    }
+
+    /* PRIORITY 3: TRACKING.cuts — walk backwards for meaningful diff */
     if (typeof TRACKING !== 'undefined' && TRACKING.cuts && TRACKING.cuts.length >= 2) {
-      /* Walk backwards to find a cut with at least 0.005pp difference */
       for (let i = TRACKING.cuts.length - 2; i >= 0; i--) {
         const cut = TRACKING.cuts[i];
         const prev = cut[trackKeyMap[c.key]] || cut[c.trackKey] || 0;
@@ -1920,6 +1926,11 @@ async function refreshFromONPE() {
           const prevData = await prevResp.json();
           if (prevData.regions && prevData.regions.length >= 26) {
             _prevRegions = prevData.regions;
+          }
+          /* Store KV prev national candidates as the canonical ghost baseline.
+             Same for all clients — ensures consistent hot-mover detection. */
+          if (prevData.national && prevData.national.candidates) {
+            _kvPrevCandidates = prevData.national.candidates;
           }
         }
       } catch(e) { /* Non-critical */ }

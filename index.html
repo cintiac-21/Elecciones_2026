@@ -479,7 +479,7 @@
         <span class="live-dot"></span>
         <span id="lastUpdate">Consultando ONPE en vivo...</span>
       </div>
-      <div class="hero-version">v3.4.1</div>
+      <div class="hero-version">v3.4.2</div>
     </div>
     <div class="hero-right">
       <button class="refresh-btn" id="refreshBtn" onclick="refreshFromONPE()">
@@ -818,15 +818,30 @@ function renderKPIs(values) {
   })).sort((a, b) => b.pct - a.pct);
 
   /*
-   * Ghost baseline: ONLY uses _kvPrevCandidates (server-side KV).
+   * Ghost baseline — ONLY server-side sources (consistent across all clients):
+   * 1. _kvPrevCandidates (latest KV snapshot, ~3 min old)
+   * 2. TRACKING.cuts (historical KV cuts, added when national pct moved >0.3pp)
    * No local fallback — guarantees all clients see identical deltas.
-   * Returns 0 if KV prev not loaded or delta below threshold.
    */
   function getGhostPrev(c) {
-    if (!_kvPrevCandidates) return 0;
-    const prev = _kvPrevCandidates[c.key] || 0;
-    if (prev > 0 && Math.abs(c.pct - prev) > 0.005) return prev;
-    return 0; /* No meaningful change — consistent empty state across all clients */
+    const trackKeyMap = {fuji:'fujimori', rla:'rla', nieto:'nieto', sanch:'sanchez', belm:'belmont'};
+
+    /* PRIORITY 1: KV prev_snapshot — most recent server-side reference */
+    if (_kvPrevCandidates) {
+      const prev = _kvPrevCandidates[c.key] || 0;
+      if (prev > 0 && Math.abs(c.pct - prev) > 0.005) return prev;
+    }
+
+    /* PRIORITY 2: TRACKING.cuts — server-side KV history, walk backwards */
+    if (typeof TRACKING !== 'undefined' && TRACKING.cuts && TRACKING.cuts.length >= 2) {
+      for (let i = TRACKING.cuts.length - 2; i >= 0; i--) {
+        const cut = TRACKING.cuts[i];
+        const prev = cut[trackKeyMap[c.key]] || cut[c.trackKey] || 0;
+        if (prev > 0 && Math.abs(c.pct - prev) > 0.005) return prev;
+      }
+    }
+
+    return 0; /* No meaningful comparison available */
   }
 
   function ghostHtml(c) {

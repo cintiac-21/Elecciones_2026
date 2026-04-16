@@ -1146,7 +1146,7 @@ function showRegionMovers() {
   /* Render elements hidden, then slam each one with staggered setTimeout */
   const fireSvg = '<svg width="13" height="13" viewBox="0 0 24 24" fill="#EF9F27" style="vertical-align:-2px;margin-right:2px"><path d="M12 23c-3.9 0-7-3.1-7-7 0-2.1 1.1-4.5 2.5-6.4C9.2 7.5 11 5.5 12 2c1 3.5 2.8 5.5 4.5 7.6C17.9 11.5 19 13.9 19 16c0 3.9-3.1 7-7 7z"/></svg>';
   container.innerHTML =
-    `<span class="region-mover rm-label" id="_rmL">${fireSvg}Top Movers ${candLabel}:</span>` +
+    `<span class="region-mover rm-label" id="_rmL">${fireSvg}Boost para ${candLabel} desde:</span>` +
     top3.map((r, i) => {
       const votesStr = r.delta >= 1000
         ? '+' + (r.delta / 1000).toFixed(1) + 'k'

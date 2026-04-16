@@ -155,7 +155,7 @@
     .region-movers:empty{display:none}
     .region-mover{display:inline-flex;align-items:center;gap:4px;font-family:'DM Mono',monospace;
       font-size:11px;padding:4px 10px;border-radius:5px;opacity:0;transform:scale(0) translateY(-30px);
-      position:relative}
+      position:relative;white-space:nowrap}
     .region-mover .rm-name{font-weight:700;color:var(--tx1)}
     .region-mover .rm-delta{font-weight:600}
     .region-mover.rm-up{background:rgba(46,205,167,.1);border:1px solid rgba(46,205,167,.25);color:#2ECDA7}
@@ -357,12 +357,18 @@
       .kpi-label{font-size:9px}
       .kpi-avatar{width:26px;height:26px}
 
+      /* Region movers: when inside .kpis grid, span full width (appears below hot card) */
+      .kpis .region-movers{grid-column:1/-1;margin:0;padding:6px 4px}
+
       /* Probability bars: vertical stack */
       .prob-section{padding:10px 12px}
       .prob-bars{flex-direction:column;gap:8px}
       .prob-item{min-width:unset}
       .prob-name{min-width:65px;font-size:10px}
       .prob-pct{font-size:13px;min-width:32px}
+
+      /* Region movers: label takes own row on mobile */
+      .region-mover.rm-label{flex-basis:100%;justify-content:center;padding:2px 4px;font-size:10px}
 
       /* Cards */
       .card{padding:12px}
@@ -1156,6 +1162,16 @@ function showRegionMovers() {
         <span class="rm-delta">${votesStr}</span>
       </span>`;
     }).join('');
+
+  /* Position: on mobile (≤600px), insert container INSIDE kpis grid right after
+     the hot candidate card, spanning full width. On desktop, keep it below kpis. */
+  const hotCard = document.querySelector(`.kpi[data-candidate="${fieldKey}"]`);
+  const kpisContainer = document.getElementById('kpiCandidates');
+  if (window.innerWidth <= 600 && hotCard && kpisContainer) {
+    hotCard.insertAdjacentElement('afterend', container);
+  } else if (kpisContainer && container.parentElement !== kpisContainer.parentElement) {
+    kpisContainer.insertAdjacentElement('afterend', container);
+  }
 
   /* Staggered slam: label fades in, then each badge slams 500ms apart */
   setTimeout(() => { const el = document.getElementById('_rmL'); if (el) el.classList.add('slam-label'); }, 0);

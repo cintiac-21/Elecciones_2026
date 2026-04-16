@@ -479,7 +479,7 @@
         <span class="live-dot"></span>
         <span id="lastUpdate">Consultando ONPE en vivo...</span>
       </div>
-      <div class="hero-version">v3.5.1</div>
+      <div class="hero-version">v3.5.2</div>
     </div>
     <div class="hero-right">
       <button class="refresh-btn" id="refreshBtn" onclick="refreshFromONPE()">
@@ -1092,22 +1092,8 @@ function animateSlam(container) {
   });
 }
 
-/* Restore last render from localStorage on page load — HTML only, animate later */
-function restoreMoversFromCache() {
-  try {
-    const cached = localStorage.getItem('lastMovers');
-    if (cached) {
-      const data = JSON.parse(cached);
-      const container = document.getElementById('regionMovers');
-      if (container && data.html) {
-        container.innerHTML = data.html;
-        _lastMoversSignature = data.signature || '';
-        /* DOM is injected but elements stay invisible (CSS default opacity:0).
-           showRegionMovers() will trigger the slam when it runs. */
-      }
-    }
-  } catch(e) {}
-}
+/* Region movers persistence is fully server-side (KV last_boost).
+   No client-side localStorage cache — ensures all clients see identical boost. */
 
 function showRegionMovers() {
   const container = document.getElementById('regionMovers');
@@ -1156,13 +1142,6 @@ function showRegionMovers() {
 
   container.innerHTML = html;
   _moversAnimated = true;
-
-  /* Persist to localStorage so F5 restores the boost instantly */
-  try {
-    localStorage.setItem('lastMovers', JSON.stringify({
-      html: html, signature: signature, ts: Date.now()
-    }));
-  } catch(e) {}
 
   animateSlam(container);
 }
@@ -1216,9 +1195,6 @@ function showHeroFallback() {
 
   /* 1. Render everything with embedded data NOW */
   await renderWithEmbeddedData();
-
-  /* Restore last region movers from localStorage immediately (no wait) */
-  restoreMoversFromCache();
 
   /* 2. If Worker configured, refresh in background (will overwrite embedded data) */
   if (WORKER_URL && !WORKER_URL.includes('TUSUBDOMINIO')) {

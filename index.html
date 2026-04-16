@@ -827,10 +827,26 @@ let _prevRegions = null;
 let _kvPrevCandidates = null;
 /* Server-computed derived data: { ghosts, hotMover, boost } — same for all clients */
 let _serverDerived = null;
+/* Current national vote totals from ONPE snapshot — source of truth for real vote gaps */
+let _currentNational = null;
+let _currentCandidateVotes = null;
 
 /* Timing constants for reveal sequence */
 const KPI_STAGGER_MS = 280;  /* Delay between each card reveal */
 const KPI_COUNTUP_MS = 550;  /* Count-up animation duration per card */
+
+function getNationalCandidateVotes() {
+  const n = _currentNational || {};
+  const v = n.candidateVotes || n.currentVotes || n.votesByCandidate || _currentCandidateVotes || null;
+  if (!v) return null;
+  return {
+    fuji: Number(v.fuji) || 0,
+    rla: Number(v.rla) || 0,
+    nieto: Number(v.nieto) || 0,
+    belm: Number(v.belm) || 0,
+    sanch: Number(v.sanch) || 0,
+  };
+}
 
 /**
  * renderKPIs — Genera KPI cards ordenadas de mayor a menor %.
@@ -874,16 +890,27 @@ function renderKPIs(values) {
     </div>`;
   }
 
-  /* Estimate total valid votes for vote gap calculation */
+  /* Vote gap: use REAL national votes from ONPE when available. Fallback to estimated gap. */
   const totalVV = ONPE_REGIONS.reduce((s, r) => s + (r.vv || 0), 0) || 15000000;
+  const realVotes = getNationalCandidateVotes();
 
   function voteGapHtml(c, i) {
     if (!values || i === 0) return ''; /* 1st place has no one above */
     const above = sorted[i - 1];
-    const gapPct = above.pct - c.pct;
-    const gapVotes = Math.round(gapPct / 100 * totalVV);
-    const gapStr = gapVotes >= 1000 ? (gapVotes / 1000).toFixed(1) + 'k' : gapVotes.toLocaleString('es-PE');
-    return `<div class="kpi-gap">~-${gapStr} vs ${i}°</div>`;
+
+    let gapVotes = 0;
+    let approx = true;
+    if (realVotes && realVotes[above.key] > 0 && realVotes[c.key] > 0) {
+      gapVotes = realVotes[above.key] - realVotes[c.key];
+      approx = false;
+    } else {
+      const gapPct = above.pct - c.pct;
+      gapVotes = Math.round(gapPct / 100 * totalVV);
+    }
+
+    const absGap = Math.abs(gapVotes);
+    const gapStr = absGap.toLocaleString('es-PE');
+    return `<div class="kpi-gap">${approx ? '~' : ''}-${gapStr} vs ${i}°</div>`;
   }
 
   container.innerHTML = sorted.map((c, i) => {
@@ -1873,6 +1900,8 @@ async function refreshFromONPE() {
     const allRegions = [...(snap1.regions||[]), ...(snap2.regions||[])];
     const natPct = snap1.national.pct;
     const natCands = snap1.national.candidates;
+    _currentNational = snap1.national || null;
+    _currentCandidateVotes = snap1.national?.candidateVotes || snap1.national?.currentVotes || snap1.national?.votesByCandidate || null;
 
     /* Capture server-computed derived data (ghosts, hotMover, boost).
        Prefer snap2 (has full 26 regions so boost is populated). */
@@ -2117,6 +2146,8 @@ function runProjection(regions) {
 
     const vvPuras = r._projVvPuras || 0;
     const vvJee = r._projVvJee || 0;
+    const pureShare = (vvPuras + vvJee) > 0 ? (vvPuras / (vvPuras + vvJee)) : 0;
+    const sanEff = 1.0 + (sanF - 1.0) * Math.sqrt(pureShare);
 
     /* Neutral for all candidates by default */
     totPend[0] += vvPend * (pcts[0] / 100);                /* Fujimori */
@@ -2126,11 +2157,7 @@ function runProjection(regions) {
     /* RLA keeps regional empirical factor across remaining actas */
     totPend[1] += vvPend * (pcts[1] / 100) * rlaF;
 
-    /* Sánchez boost fades smoothly as pure pending actas shrink vs JEE.
-       When pure pending dominates, sanEff stays close to sanF.
-       When JEE dominates, sanEff cools toward 1.0 without a hard cut. */
-    const pureShare = (vvPuras + vvJee) > 0 ? (vvPuras / (vvPuras + vvJee)) : 0;
-    const sanEff = 1.0 + (sanF - 1.0) * Math.sqrt(pureShare);
+    /* Sánchez boost fades smoothly as pure pending actas disappear and JEE dominates */
     totPend[4] += vvPend * (pcts[4] / 100) * sanEff;
     totalVV += r.vv;
   });
@@ -2237,14 +2264,14 @@ function updateProjectionUI(projection, probs, vvNational) {
     /* Estimate total votes from projected % against NATIONAL total VV (not just top 5) */
     const totalEstVV = vvNational || 17000000;
     const estVotes = Math.round(p.pct / 100 * totalEstVV);
-    const votesStr = estVotes > 0 ? '~' + (estVotes / 1000).toFixed(0) + 'k' : '—';
+    const votesStr = estVotes > 0 ? '~' + estVotes.toLocaleString('es-PE') : '—';
     const nextCandidate = sorted[i + 1];
     let gapStr = '—', gapColor = 'var(--tx3)', gapLabel = '';
     if (nextCandidate && estVotes > 0) {
       const nextVotes = Math.round(nextCandidate.pct / 100 * totalEstVV);
       const gapVotes = estVotes - nextVotes;
       gapLabel = `<span style="font-size:9px;color:var(--tx3)">vs ${i+2}° </span>`;
-      gapStr = gapLabel + '~+' + (gapVotes / 1000).toFixed(1) + 'k';
+      gapStr = gapLabel + '~+' + gapVotes.toLocaleString('es-PE');
       gapColor = gapVotes > 50000 ? 'var(--c-nieto)' : gapVotes > 10000 ? 'var(--tx2)' : 'var(--c-sanch)';
     }
 

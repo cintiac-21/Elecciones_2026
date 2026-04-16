@@ -1132,7 +1132,7 @@ function showRegionMovers() {
       if (!curr.vv || !prev.vv) return;
       delta = (curr.vv * (curr[fieldKey] || 0) / 100) - (prev.vv * (prev[fieldKey] || 0) / 100);
     }
-    if (delta > 10) { /* Only positive contributions, ignore noise < 10 votes */
+    if (delta > 0) { /* Any positive contribution — at 90%+ even tiny deltas matter */
       contributions.push({ name: curr.name, delta: delta });
     }
   });

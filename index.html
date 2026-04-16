@@ -100,6 +100,8 @@
     .hero-pct-num{display:inline;animation:countReveal .6s cubic-bezier(.34,1.56,.64,1) forwards}
     @keyframes countReveal{from{opacity:0;transform:scale(.7) translateY(15px);filter:blur(6px)}to{opacity:1;transform:scale(1) translateY(0);filter:blur(0)}}
     .hero-live{display:flex;align-items:center;justify-content:center;gap:6px;font-size:11px;color:var(--tx3);margin-top:2px}
+    .hero-onpe-ts{font-size:10.5px;color:var(--c-nieto);margin-top:2px;font-weight:600;letter-spacing:0.01em}
+    .hero-onpe-ts:empty{display:none}
     .hero-version{text-align:center;font-family:'DM Mono',monospace;font-size:9px;color:var(--tx3);opacity:.5;margin-top:2px;letter-spacing:.5px}
     .live-dot{width:7px;height:7px;border-radius:50%;background:var(--c-nieto);animation:livePulse 2s ease-in-out infinite}
     @keyframes livePulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(46,205,167,.5)}50%{opacity:.7;box-shadow:0 0 0 6px rgba(46,205,167,0)}}
@@ -345,6 +347,7 @@
       .hero-pct-sign{font-size:28px}
       .hero-label{font-size:9px;letter-spacing:1px}
       .hero-live{font-size:10px}
+      .hero-onpe-ts{font-size:9.5px}
 
       /* Tabs: full width, equal */
       .tabs{gap:0}
@@ -479,7 +482,8 @@
         <span class="live-dot"></span>
         <span id="lastUpdate">Consultando ONPE en vivo...</span>
       </div>
-      <div class="hero-version">v3.5.2</div>
+      <div class="hero-onpe-ts" id="onpeLastUpdate"></div>
+      <div class="hero-version">v3.6.2</div>
     </div>
     <div class="hero-right">
       <button class="refresh-btn" id="refreshBtn" onclick="refreshFromONPE()">
@@ -1917,6 +1921,23 @@ async function refreshFromONPE() {
     document.getElementById('lastUpdate').textContent =
       new Date().toLocaleString('es-PE', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) +
       ' · ' + allRegions.length + ' regiones' + freshness;
+
+    /* 6b. Show ONPE's own data timestamp (in Peru time GMT-5) */
+    const onpeTs = snap1.national?.fechaActualizacion;
+    const onpeEl = document.getElementById('onpeLastUpdate');
+    if (onpeEl) {
+      if (onpeTs && typeof onpeTs === 'number') {
+        /* Unix ms timestamp from ONPE's feed, rendered in Lima timezone */
+        const onpeStr = new Date(onpeTs).toLocaleString('es-PE', {
+          timeZone: 'America/Lima',
+          day: '2-digit', month: '2-digit', year: 'numeric',
+          hour: '2-digit', minute: '2-digit', hour12: true
+        });
+        onpeEl.textContent = 'Última actualización de la ONPE: ' + onpeStr;
+      } else {
+        onpeEl.textContent = '';
+      }
+    }
 
     /* 7. Re-render */
     setStatus('Redibujando...', '');

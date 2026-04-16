@@ -479,7 +479,7 @@
         <span class="live-dot"></span>
         <span id="lastUpdate">Consultando ONPE en vivo...</span>
       </div>
-      <div class="hero-version">v3.4.4</div>
+      <div class="hero-version">v3.5.0</div>
     </div>
     <div class="hero-right">
       <button class="refresh-btn" id="refreshBtn" onclick="refreshFromONPE()">
@@ -795,6 +795,8 @@ let _ghostDeltas = {}; /* {fuji: -0.031, rla: -0.125, ...} */
 let _prevRegions = null;
 /* KV-based previous national candidates — same for all clients, canonical ghost baseline */
 let _kvPrevCandidates = null;
+/* Server-computed derived data: { ghosts, hotMover, boost } — same for all clients */
+let _serverDerived = null;
 
 /* Timing constants for reveal sequence */
 const KPI_STAGGER_MS = 280;  /* Delay between each card reveal */
@@ -818,15 +820,13 @@ function renderKPIs(values) {
   })).sort((a, b) => b.pct - a.pct);
 
   /*
-   * Ghost baseline: ONLY _kvPrevCandidates (server-side KV).
-   * If KV equals current, no ghost shown — consistent empty state across all clients.
-   * TRACKING.cuts fallback removed because it merges client-specific localStorage data.
+   * Ghost baseline: reads pre-computed prev/delta from server (_serverDerived.ghosts).
+   * Server ensures consistency across all clients.
    */
   function getGhostPrev(c) {
-    if (!_kvPrevCandidates) return 0;
-    const prev = _kvPrevCandidates[c.key] || 0;
-    if (prev > 0 && prev !== c.pct) return prev;
-    return 0; /* KV == current → no ghost, everyone sees the same */
+    if (!_serverDerived?.ghosts) return 0;
+    const g = _serverDerived.ghosts[c.key];
+    return g?.prev || 0;
   }
 
   function ghostHtml(c) {
@@ -1033,25 +1033,13 @@ function updateTrendArrows() {
   });
 }
 
-/* Highlight the candidate rising the most (based on last 3 real tracking cuts) */
+/* Highlight the hot-mover candidate — uses server-computed _serverDerived.hotMover */
 let _hotMoverTimeout = null;
 function highlightHotMover() {
-  /* Use _ghostDeltas — same source as the visible ghost values.
-     This ensures the hot-mover always matches what the user sees. */
-  if (!_ghostDeltas || Object.keys(_ghostDeltas).length === 0) return;
+  /* Read server-computed hot-mover (same for all clients) */
+  const shortKey = _serverDerived?.hotMover;
+  if (!shortKey) return;
 
-  const trackToShort = {fujimori:'fuji', rla:'rla', nieto:'nieto', sanchez:'sanch', belmont:'belm'};
-  let maxDelta = 0, maxKey = null;
-
-  Object.entries(_ghostDeltas).forEach(([tk, delta]) => {
-    if (delta > maxDelta) { maxDelta = delta; maxKey = tk; }
-  });
-
-  /* Nobody went up → no glow */
-  if (!maxKey || maxDelta <= 0) return;
-
-  /* Map tracking key to short key for card lookup */
-  const shortKey = trackToShort[maxKey] || maxKey;
   const targetCard = document.querySelector(`.kpi[data-candidate="${shortKey}"]`);
   if (!targetCard) return;
 
@@ -1123,23 +1111,12 @@ function restoreMoversFromCache() {
 
 function showRegionMovers() {
   const container = document.getElementById('regionMovers');
-  if (!container || !_prevRegions || _prevRegions.length === 0) {
-    /* No prev data available — if we have cached DOM, slam it anyway */
-    if (container && !_moversAnimated && container.children.length > 0) {
-      animateSlam(container);
-      _moversAnimated = true;
-    }
-    return;
-  }
+  if (!container) return;
 
-  /* Find the hot-mover candidate (same logic as highlightHotMover) */
-  const trackToField = {fujimori:'fuji', rla:'rla', nieto:'nieto', sanchez:'sanch', belmont:'belm'};
-  let maxDelta = 0, hotTrackKey = null;
-  Object.entries(_ghostDeltas).forEach(([tk, delta]) => {
-    if (delta > maxDelta) { maxDelta = delta; hotTrackKey = tk; }
-  });
-  /* No hot mover → keep previous render, but slam cached content if not yet animated */
-  if (!hotTrackKey || maxDelta <= 0) {
+  const boost = _serverDerived?.boost;
+
+  /* No boost data from server — keep cached DOM from localStorage if present */
+  if (!boost || !boost.regions || boost.regions.length === 0) {
     if (!_moversAnimated && container.children.length > 0) {
       animateSlam(container);
       _moversAnimated = true;
@@ -1147,47 +1124,10 @@ function showRegionMovers() {
     return;
   }
 
-  const fieldKey = trackToField[hotTrackKey] || hotTrackKey;
-  const candConfig = CANDIDATE_CONFIG.find(c => c.trackKey === hotTrackKey);
-  const candLabel = candConfig ? candConfig.short : hotTrackKey;
-
-  /* Calculate per-region RAW vote delta for this candidate.
-     Uses totalVotosValidos (integer from ONPE) — no rounding noise from pct multiplication. */
-  const voteKey = fieldKey + '_v';
-  const contributions = [];
-  ONPE_REGIONS.forEach(curr => {
-    const prev = _prevRegions.find(p => p.name === curr.name);
-    if (!prev) return;
-    /* Fallback to pct×vv only if raw vote fields not available (old KV snapshot) */
-    const hasRaw = (curr[voteKey] !== undefined) && (prev[voteKey] !== undefined);
-    let delta;
-    if (hasRaw) {
-      delta = (curr[voteKey] || 0) - (prev[voteKey] || 0);
-    } else {
-      if (!curr.vv || !prev.vv) return;
-      delta = (curr.vv * (curr[fieldKey] || 0) / 100) - (prev.vv * (prev[fieldKey] || 0) / 100);
-    }
-    if (delta > 0) { /* Any positive contribution — at 90%+ even tiny deltas matter */
-      contributions.push({ name: curr.name, delta: delta });
-    }
-  });
-
-  /* Sort by contribution descending — biggest boost first */
-  contributions.sort((a, b) => b.delta - a.delta);
-  const top3 = contributions.slice(0, 3);
-
-  /* No positive regions for hot-mover → slam cached content if not yet animated */
-  if (top3.length === 0) {
-    if (!_moversAnimated && container.children.length > 0) {
-      animateSlam(container);
-      _moversAnimated = true;
-    }
-    return;
-  }
-
-  /* Signature check: if same candidate + same regions + same deltas, just slam cached */
-  const signature = hotTrackKey + '|' + top3.map(r => r.name + ':' + Math.round(r.delta)).join(',');
+  /* Build signature to detect if the boost actually changed */
+  const signature = boost.candidate + '|' + boost.regions.map(r => r.name + ':' + r.votes).join(',');
   if (signature === _lastMoversSignature) {
+    /* Same data as cached — just animate if not yet animated this session */
     if (!_moversAnimated && container.children.length > 0) {
       animateSlam(container);
       _moversAnimated = true;
@@ -1196,14 +1136,18 @@ function showRegionMovers() {
   }
   _lastMoversSignature = signature;
 
-  /* New data — render fresh and slam */
+  /* Look up candidate's display label */
+  const candConfig = CANDIDATE_CONFIG.find(c => c.key === boost.candidate);
+  const candLabel = candConfig ? candConfig.short : boost.candidate;
+
+  /* Render the HTML — one label + 1-3 region badges */
   const fireSvg = '<svg width="13" height="13" viewBox="0 0 24 24" fill="#EF9F27" style="vertical-align:-2px;margin-right:2px"><path d="M12 23c-3.9 0-7-3.1-7-7 0-2.1 1.1-4.5 2.5-6.4C9.2 7.5 11 5.5 12 2c1 3.5 2.8 5.5 4.5 7.6C17.9 11.5 19 13.9 19 16c0 3.9-3.1 7-7 7z"/></svg>';
   const html =
     `<span class="region-mover rm-label" id="_rmL">${fireSvg}Boost para ${candLabel} desde:</span>` +
-    top3.map((r, i) => {
-      const votesStr = r.delta >= 1000
-        ? '+' + (r.delta / 1000).toFixed(1) + 'k'
-        : '+' + Math.round(r.delta);
+    boost.regions.map((r, i) => {
+      const votesStr = r.votes >= 1000
+        ? '+' + (r.votes / 1000).toFixed(1) + 'k'
+        : '+' + Math.round(r.votes);
       return `<span class="region-mover rm-up" id="_rm${i}">
         <span class="rm-name">${r.name}</span>
         <span class="rm-delta">${votesStr}</span>
@@ -1213,7 +1157,7 @@ function showRegionMovers() {
   container.innerHTML = html;
   _moversAnimated = true;
 
-  /* Persist to localStorage — survives F5 and across tabs */
+  /* Persist to localStorage so F5 restores the boost instantly */
   try {
     localStorage.setItem('lastMovers', JSON.stringify({
       html: html, signature: signature, ts: Date.now()
@@ -1221,15 +1165,6 @@ function showRegionMovers() {
   } catch(e) {}
 
   animateSlam(container);
-
-  /* Staggered slam: label fades in, then each badge slams 500ms apart */
-  setTimeout(() => { const el = document.getElementById('_rmL'); if (el) el.classList.add('slam-label'); }, 0);
-  top3.forEach((_, i) => {
-    setTimeout(() => {
-      const el = document.getElementById('_rm' + i);
-      if (el) { el.classList.add('slam', 'slam-flash'); }
-    }, 500 + i * 500);
-  });
 }
 
 /* Update national vote counters */
@@ -1932,6 +1867,10 @@ async function refreshFromONPE() {
     const allRegions = [...(snap1.regions||[]), ...(snap2.regions||[])];
     const natPct = snap1.national.pct;
     const natCands = snap1.national.candidates;
+
+    /* Capture server-computed derived data (ghosts, hotMover, boost).
+       Prefer snap2 (has full 26 regions so boost is populated). */
+    _serverDerived = snap2.derived || snap1.derived || null;
 
     /* 1. Update JEE */
     const jeeActas = snap1.national.enviadasJee || 0;

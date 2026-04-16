@@ -1006,28 +1006,22 @@ function updateTrendArrows() {
 /* Highlight the candidate rising the most (based on last 3 real tracking cuts) */
 let _hotMoverTimeout = null;
 function highlightHotMover() {
-  /* Filter out projection cuts (pct >= 99) */
-  const realCuts = TRACKING.cuts.filter(c => c.pct < 99);
-  if (realCuts.length < 2) return;
+  /* Use _ghostDeltas — same source as the visible ghost values.
+     This ensures the hot-mover always matches what the user sees. */
+  if (!_ghostDeltas || Object.keys(_ghostDeltas).length === 0) return;
 
-  const first = realCuts[Math.max(0, realCuts.length - 3)];
-  const last = realCuts[realCuts.length - 1];
-
-  /* Map tracking keys to short keys used in data-candidate attributes */
   const trackToShort = {fujimori:'fuji', rla:'rla', nieto:'nieto', sanchez:'sanch', belmont:'belm'};
-  const keys = ['fujimori','rla','nieto','sanchez','belmont'];
   let maxDelta = 0, maxKey = null;
 
-  keys.forEach(k => {
-    const delta = (last[k]||0) - (first[k]||0);
-    if (delta > maxDelta) { maxDelta = delta; maxKey = k; }
+  Object.entries(_ghostDeltas).forEach(([tk, delta]) => {
+    if (delta > maxDelta) { maxDelta = delta; maxKey = tk; }
   });
 
   /* Nobody went up → no glow */
   if (!maxKey || maxDelta <= 0) return;
 
-  /* Find card by data-candidate attribute (works with dynamic sorted KPIs) */
-  const shortKey = trackToShort[maxKey];
+  /* Map tracking key to short key for card lookup */
+  const shortKey = trackToShort[maxKey] || maxKey;
   const targetCard = document.querySelector(`.kpi[data-candidate="${shortKey}"]`);
   if (!targetCard) return;
 

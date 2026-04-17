@@ -718,7 +718,7 @@
         <span id="lastUpdate">Consultando ONPE en vivo...</span>
       </div>
       <div class="hero-onpe-ts" id="onpeLastUpdate"></div>
-      <div class="hero-version">v3.8.2</div>
+      <div class="hero-version">v3.8.3</div>
     </div>
     <div class="hero-right">
       <button class="share-btn" id="shareBtn" title="Compartir">
@@ -1082,6 +1082,7 @@ let _jeeRate = 1.0; /* Dynamic JEE acceptance rate — updated by runProjection(
 /* Delta tracker baseline: exact votes from ONPE CSV at 93.064% (16/04/2026 18:04)
    The delta tracker shows changes since this snapshot. */
 let _prevRegionVotes = {
+  '_NATIONAL': {sanch: 1880341, rla: 1873818, jee: 5413},
   'Amazonas':{sanch:55364,rla:5712,jee:81},
   'Áncash':{sanch:74268,rla:29864,jee:241},
   'Apurímac':{sanch:79276,rla:6120,jee:47},
@@ -2897,25 +2898,35 @@ function updateDeltaTracker() {
   /* Show all regions with any movement (filter tiny rounding noise only) */
   const significant = deltas.filter(d => Math.abs(d.dS) >= 5 || Math.abs(d.dR) >= 5 || Math.abs(d.dJee) >= 1);
 
-  /* Summary bar */
-  const totalNet = totalDS - totalDR;
-  const netColor = totalNet > 0 ? 'var(--c-sanch)' : 'var(--c-rla)';
-  const netLabel = totalNet > 0 ? 'Sánchez' : 'López Aliaga';
-  const jeeHtml = totalJee !== 0
-    ? `<div class="delta-stat"><span class="ds-label">→ JEE:</span><span class="ds-val" style="color:var(--c-fuji)">${totalJee > 0 ? '+' : ''}${totalJee.toLocaleString('es-PE')}</span></div>`
+  /* Use NATIONAL totals for summary (more accurate than sum of regions due to ONPE rounding).
+     _currentNational has the live snapshot; _prevRegionVotes._NATIONAL has the baseline. */
+  const natBaseline = _prevRegionVotes['_NATIONAL'] || {sanch: 0, rla: 0, jee: 0};
+  const natNowS = (_currentNational?.candidateVotes?.sanch) || (_currentNational?.candidates?.sanch_v) || (totalDS + natBaseline.sanch);
+  const natNowR = (_currentNational?.candidateVotes?.rla) || (_currentNational?.candidates?.rla_v) || (totalDR + natBaseline.rla);
+  const natNowJee = (_currentNational?.enviadasJee) || 0;
+  const natDS = natNowS - natBaseline.sanch;
+  const natDR = natNowR - natBaseline.rla;
+  const natDJee = natNowJee - natBaseline.jee;
+  const natNet = natDS - natDR;
+
+  /* Summary bar — uses national totals */
+  const netColor = natNet > 0 ? 'var(--c-sanch)' : 'var(--c-rla)';
+  const netLabel = natNet > 0 ? 'Sánchez' : 'López Aliaga';
+  const jeeHtml = natDJee !== 0
+    ? `<div class="delta-stat"><span class="ds-label">→ JEE:</span><span class="ds-val" style="color:var(--c-fuji)">${natDJee > 0 ? '+' : ''}${natDJee.toLocaleString('es-PE')}</span></div>`
     : '';
   summary.innerHTML = `
     <div class="delta-stat">
       <span class="ds-label">Sánchez:</span>
-      <span class="ds-val dt-sanch">${totalDS > 0 ? '+' : ''}${totalDS.toLocaleString('es-PE')}</span>
+      <span class="ds-val dt-sanch">${natDS > 0 ? '+' : ''}${natDS.toLocaleString('es-PE')}</span>
     </div>
     <div class="delta-stat">
       <span class="ds-label">López Aliaga:</span>
-      <span class="ds-val dt-rla">${totalDR > 0 ? '+' : ''}${totalDR.toLocaleString('es-PE')}</span>
+      <span class="ds-val dt-rla">${natDR > 0 ? '+' : ''}${natDR.toLocaleString('es-PE')}</span>
     </div>
     <div class="delta-stat">
       <span class="ds-label">Neto:</span>
-      <span class="ds-val" style="color:${netColor}">${totalNet > 0 ? '+' : ''}${totalNet.toLocaleString('es-PE')} ${netLabel}</span>
+      <span class="ds-val" style="color:${netColor}">${natNet > 0 ? '+' : ''}${natNet.toLocaleString('es-PE')} ${netLabel}</span>
     </div>
     ${jeeHtml}`;
 
@@ -2934,14 +2945,14 @@ function updateDeltaTracker() {
     </tr>`;
   });
 
-  /* Total row */
-  const totalNetCls = totalNet > 0 ? 'dt-pos' : 'dt-neg';
-  const totalJeeStr = totalJee !== 0 ? `<span style="color:var(--c-fuji)">${totalJee > 0 ? '+' : ''}${totalJee.toLocaleString('es-PE')}</span>` : '—';
+  /* Total row — uses NATIONAL totals, not sum of regions */
+  const totalNetCls = natNet > 0 ? 'dt-pos' : 'dt-neg';
+  const totalJeeStr = natDJee !== 0 ? `<span style="color:var(--c-fuji)">${natDJee > 0 ? '+' : ''}${natDJee.toLocaleString('es-PE')}</span>` : '—';
   rows += `<tr>
     <td>TOTAL</td>
-    <td class="dt-sanch">${totalDS > 0 ? '+' : ''}${totalDS.toLocaleString('es-PE')}</td>
-    <td class="dt-rla">${totalDR > 0 ? '+' : ''}${totalDR.toLocaleString('es-PE')}</td>
-    <td class="${totalNetCls}">${totalNet > 0 ? '+' : ''}${totalNet.toLocaleString('es-PE')}</td>
+    <td class="dt-sanch">${natDS > 0 ? '+' : ''}${natDS.toLocaleString('es-PE')}</td>
+    <td class="dt-rla">${natDR > 0 ? '+' : ''}${natDR.toLocaleString('es-PE')}</td>
+    <td class="${totalNetCls}">${natNet > 0 ? '+' : ''}${natNet.toLocaleString('es-PE')}</td>
     <td>${totalJeeStr}</td>
   </tr>`;
 

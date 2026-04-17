@@ -537,8 +537,17 @@
       border-radius:var(--radius);padding:14px 16px;margin-bottom:16px}
     .delta-tracker.visible{display:block}
     .delta-title{font-size:12px;font-weight:600;color:var(--tx2);text-transform:uppercase;
-      letter-spacing:.8px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+      letter-spacing:.8px;margin-bottom:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
     .delta-title svg{color:var(--tx3);opacity:.6}
+    .delta-badge{display:inline-flex;align-items:center;gap:4px;
+      background:linear-gradient(135deg,rgba(224,72,72,.15),rgba(74,144,217,.15));
+      border:1px solid rgba(224,72,72,.25);color:var(--tx1);
+      padding:2px 10px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.5px}
+    .delta-note{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--tx3);
+      text-transform:none;letter-spacing:0;font-weight:400;margin-bottom:10px}
+    @keyframes pulseDot{0%,100%{opacity:.4;transform:scale(.9)}50%{opacity:1;transform:scale(1.1)}}
+    .pulse-dot{width:8px;height:8px;border-radius:50%;background:#E8943A;
+      animation:pulseDot 2.5s ease-in-out infinite;flex-shrink:0}
     .delta-summary{display:flex;gap:16px;margin-bottom:10px;flex-wrap:wrap;justify-content:center}
     .delta-stat{display:flex;align-items:baseline;gap:6px;font-family:'DM Mono',monospace;font-size:13px}
     .delta-stat .ds-label{font-size:11px;color:var(--tx3);font-family:'DM Sans',sans-serif}
@@ -718,7 +727,7 @@
         <span id="lastUpdate">Consultando ONPE en vivo...</span>
       </div>
       <div class="hero-onpe-ts" id="onpeLastUpdate"></div>
-      <div class="hero-version">v3.9.4</div>
+      <div class="hero-version">v3.9.5</div>
     </div>
     <div class="hero-right">
       <button class="share-btn" id="shareBtn" title="Compartir">
@@ -786,8 +795,13 @@
     <!-- Delta Tracker: per-region vote movement analysis -->
     <div class="delta-tracker" id="deltaTracker">
       <div class="delta-title">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
-        <span>¡Nuevo! <span style="color:var(--c-fuji)">(En depuración por ajustes ONPE)</span> — Análisis al detalle de <span style="color:var(--c-sanch)">Sánchez</span> vs <span style="color:var(--c-rla)">López Aliaga</span> <span id="deltaBaseline" style="font-size:10px;color:var(--tx3);text-transform:none;letter-spacing:0">(cambios desde ONPE 93.064%)</span></span>
+        <span class="delta-badge">NUEVO</span>
+        <span><span style="color:var(--c-sanch)">Sánchez</span> vs. <span style="color:var(--c-rla)">López Aliaga</span> al detalle</span>
+        <span id="deltaBaseline" style="font-size:10px;color:var(--tx3);text-transform:none;letter-spacing:0;font-weight:400">(cambios desde ONPE 93.064%)</span>
+      </div>
+      <div class="delta-note">
+        <span class="pulse-dot"></span>
+        <span>Incluye ajustes ONPE</span>
       </div>
       <div class="delta-summary" id="deltaSummary"></div>
       <table class="delta-table">

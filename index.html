@@ -718,7 +718,7 @@
         <span id="lastUpdate">Consultando ONPE en vivo...</span>
       </div>
       <div class="hero-onpe-ts" id="onpeLastUpdate"></div>
-      <div class="hero-version">v3.8.4</div>
+      <div class="hero-version">v3.8.5</div>
     </div>
     <div class="hero-right">
       <button class="share-btn" id="shareBtn" title="Compartir">
@@ -2688,6 +2688,17 @@ function runProjection(regions, nationalPendientesJee) {
     const currentNatPct = regions.reduce((s,r) => s + r.pct * (r.vv || 0), 0) /
                            regions.reduce((s,r) => s + (r.vv || 0), 0) || 73;
     vvNational = totalVV / (currentNatPct / 100);
+  }
+
+  /* Override regional sums with national candidateVotes when available.
+     ONPE's regional sanch_v sums to ~8K less than the national total —
+     the national total is the source of truth for actual votes. */
+  const natCV = _currentCandidateVotes || _currentNational?.candidateVotes;
+  if (natCV) {
+    const natMap = {fuji: natCV.fuji, rla: natCV.rla, nieto: natCV.nieto, belm: natCV.belm, sanch: natCV.sanch};
+    KEYS.forEach((k, i) => {
+      if (natMap[k] && natMap[k] > 0) totActual[i] = natMap[k];
+    });
   }
 
   /* Final results */

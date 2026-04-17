@@ -187,6 +187,19 @@
       0%,100%{box-shadow:0 0 0 0 rgba(232,148,58,0.55);opacity:1}
       50%{box-shadow:0 0 0 8px rgba(232,148,58,0);opacity:0.6}
     }
+
+    /* Overtake ticker — shown when a candidate surpasses another */
+    .overtake-ticker{display:none;align-items:center;justify-content:center;gap:10px;
+      margin:0 auto 8px;padding:8px 20px;width:max-content;max-width:calc(100% - 24px);
+      border-radius:10px;font-size:12px;font-weight:600;color:#fff;letter-spacing:0.02em}
+    .overtake-ticker.visible{display:flex}
+    .ot-dot{width:7px;height:7px;border-radius:50%;background:#fff;flex-shrink:0;
+      animation:otDotPulse 1.2s ease-in-out infinite}
+    .ot-text{line-height:1;white-space:nowrap}
+    @keyframes otDotPulse{0%,100%{opacity:1}50%{opacity:0.35}}
+    .overtake-flash{position:fixed;inset:0;pointer-events:none;opacity:0;z-index:9000}
+    .ot-particle{position:fixed;border-radius:50%;pointer-events:none;z-index:9001}
+
     .region-mover{display:inline-flex;align-items:center;gap:4px;font-family:'DM Mono',monospace;
       font-size:11px;padding:4px 10px;border-radius:5px;opacity:0;transform:scale(0) translateY(-30px);
       position:relative;white-space:nowrap}
@@ -405,6 +418,9 @@
 
       /* Region movers: label takes own row on mobile */
       .region-mover.rm-label{flex-basis:100%;justify-content:center;padding:2px 4px;font-size:10px}
+
+      /* Overtake ticker: smaller on mobile */
+      .overtake-ticker{font-size:11px;padding:7px 14px}
 
       /* Cards */
       .card{padding:12px}
@@ -711,6 +727,14 @@
 
     <!-- KPIs: Top 5 candidates (rendered dynamically, sorted by %) -->
     <div class="kpis" id="kpiCandidates"></div>
+
+    <!-- Overtake ticker: shown when a candidate surpasses another -->
+    <div class="overtake-ticker" id="overtakeTicker">
+      <span class="ot-dot"></span>
+      <span class="ot-text" id="overtakeText"></span>
+      <span class="ot-dot"></span>
+    </div>
+    <div class="overtake-flash" id="overtakeFlash"></div>
 
     <!-- Region movers: top 3 regions driving the latest change -->
     <div class="region-movers" id="regionMovers"></div>
@@ -1097,6 +1121,19 @@ function renderKPIs(values) {
     sorted.forEach(c => { _prevKpiValues[c.key] = c.pct; _prevKpiValues[c.trackKey] = c.pct; });
   }
 
+  /* Overtake detection: compare current ranking with previous.
+     Fires animation after the reveal sequence completes. */
+  const currentRanking = values ? sorted.map(c => c.key) : null;
+  const overtake = checkOvertake(currentRanking);
+
+  /* If no overtake detected AND ranking matches previous, keep existing ticker.
+     If ranking reverted (no overtake but order changed), hide ticker. */
+  if (!overtake) {
+    const ticker = document.getElementById('overtakeTicker');
+    /* If there WAS a ticker but the ranking now matches _prevRanking → no change needed,
+       ticker stays from the last detected overtake. */
+  }
+
   /* Staggered reveal with count-up (skip animation if no values / skeletons) */
   if (!values) {
     container.querySelectorAll('.kpi').forEach(el => el.classList.add('revealed'));
@@ -1131,7 +1168,136 @@ function renderKPIs(values) {
     }, i * KPI_STAGGER_MS);
   });
 
+  /* Fire overtake animation AFTER the reveal sequence finishes */
+  if (overtake) {
+    setTimeout(() => triggerOvertakeAnimation(overtake), totalRevealMs + 600);
+  }
+
   return totalRevealMs;
+}
+
+/* ── §2a-bis  Overtake detection — fires when a candidate changes position ── */
+let _prevRanking = null; /* ['fuji','sanch','rla','nieto','belm'] sorted by pct */
+
+/**
+ * Compare current ranking with previous. Returns the most significant overtake
+ * (highest position change) or null if no change.
+ */
+function checkOvertake(currentKeys) {
+  if (!_prevRanking || !currentKeys || currentKeys.length < 2) {
+    _prevRanking = currentKeys ? [...currentKeys] : null;
+    return null;
+  }
+  /* Find candidate who moved to a HIGHER position (lower index) */
+  let bestOvertake = null;
+  for (let i = 0; i < currentKeys.length; i++) {
+    const prevIdx = _prevRanking.indexOf(currentKeys[i]);
+    if (prevIdx > i) {
+      /* This candidate moved up. Prioritize highest position (lowest i). */
+      if (!bestOvertake || i < bestOvertake.newPos) {
+        bestOvertake = {
+          winner: currentKeys[i],
+          loser: _prevRanking[i],
+          newPos: i
+        };
+      }
+    }
+  }
+  _prevRanking = [...currentKeys];
+  return bestOvertake;
+}
+
+/**
+ * Trigger the full overtake animation: flash + shockwave + particles + ticker.
+ * Uses the winner candidate's color for all effects.
+ */
+function triggerOvertakeAnimation(overtake) {
+  const winnerCfg = CANDIDATE_CONFIG.find(c => c.key === overtake.winner);
+  const loserCfg = CANDIDATE_CONFIG.find(c => c.key === overtake.loser);
+  if (!winnerCfg || !loserCfg) return;
+
+  const color = winnerCfg.colorHex;
+  const kpiSection = document.getElementById('kpiCandidates');
+  if (!kpiSection) return;
+
+  /* 1. Flash overlay */
+  const flash = document.getElementById('overtakeFlash');
+  if (flash) {
+    flash.style.background = 'radial-gradient(circle, ' + color + '55 0%, transparent 70%)';
+    flash.animate([{ opacity: 0 },{ opacity: 1 },{ opacity: 0.2 },{ opacity: 0 }],
+      { duration: 800, easing: 'ease-out' });
+  }
+
+  /* 2. Double shockwave rings from center of KPI section */
+  const kpiRect = kpiSection.getBoundingClientRect();
+  const cx = kpiRect.left + kpiRect.width / 2;
+  const cy = kpiRect.top + kpiRect.height / 2;
+  for (let w = 0; w < 2; w++) {
+    setTimeout(() => {
+      const ring = document.createElement('div');
+      ring.style.cssText = 'position:fixed;width:60px;height:60px;border-radius:50%;' +
+        'border:2.5px solid ' + color + '88;pointer-events:none;z-index:9001;' +
+        'left:' + cx + 'px;top:' + cy + 'px;transform:translate(-50%,-50%);';
+      document.body.appendChild(ring);
+      ring.animate([
+        { transform: 'translate(-50%,-50%) scale(0.2)', opacity: 0.9 },
+        { transform: 'translate(-50%,-50%) scale(6)', opacity: 0 }
+      ], { duration: 900, fill: 'forwards' });
+      setTimeout(() => ring.remove(), 1000);
+    }, w * 200);
+  }
+
+  /* 3. Particle explosion */
+  for (let i = 0; i < 35; i++) {
+    const p = document.createElement('div');
+    p.className = 'ot-particle';
+    const isWhite = i > 25;
+    p.style.background = isWhite ? '#ffffff' : color;
+    p.style.left = cx + 'px';
+    p.style.top = cy + 'px';
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 80 + Math.random() * 220;
+    const dx = Math.cos(angle) * dist;
+    const dy = Math.sin(angle) * dist;
+    const sz = 3 + Math.random() * 7;
+    p.style.width = sz + 'px';
+    p.style.height = sz + 'px';
+    document.body.appendChild(p);
+    p.animate([
+      { transform: 'translate(-50%,-50%) scale(1)', opacity: 1 },
+      { transform: 'translate(calc(-50% + ' + dx + 'px), calc(-50% + ' + dy + 'px)) scale(0)', opacity: 0 }
+    ], { duration: 700 + Math.random() * 800, easing: 'cubic-bezier(0,.8,.3,1)', fill: 'forwards' });
+    setTimeout(() => p.remove(), 1600);
+  }
+
+  /* 4. Glow on winner's card */
+  const winnerCard = document.querySelector('.kpi[data-candidate="' + overtake.winner + '"]');
+  if (winnerCard) {
+    winnerCard.style.boxShadow = '0 0 30px ' + color + '66';
+    winnerCard.style.transition = 'box-shadow 0.4s ease';
+    setTimeout(() => { winnerCard.style.boxShadow = ''; }, 4000);
+  }
+
+  /* 5. Ticker — persists until cleared by next render */
+  const ticker = document.getElementById('overtakeTicker');
+  const tickerText = document.getElementById('overtakeText');
+  if (ticker && tickerText) {
+    tickerText.textContent = winnerCfg.short + ' supera a ' + loserCfg.short +
+      ' en la carrera hacia la 2da vuelta';
+    ticker.style.background = 'linear-gradient(90deg, ' + color + ', ' + color + 'dd, ' + color + ')';
+    if (!ticker.classList.contains('visible')) {
+      ticker.style.transform = 'scaleY(0)';
+      ticker.style.transformOrigin = 'top';
+      ticker.classList.add('visible');
+      requestAnimationFrame(() => {
+        ticker.style.transition = 'transform 0.4s cubic-bezier(0.34,1.56,0.64,1)';
+        ticker.style.transform = 'scaleY(1)';
+      });
+    }
+  }
+
+  /* 6. Vibrate on mobile (subtle feedback) */
+  if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
 }
 
 /* ── §2b  Barras de probabilidad — renderizado dinámico ordenado por prob % ── */
@@ -2004,6 +2170,7 @@ function renderTrackingChart() {
    — Renzo Núñez Berdejo
 ══════════════════════════════════════════════════════════ */
 const WORKER_URL = 'https://onpe-proxy.renzonunez-af.workers.dev';
+const APP_VERSION = 'v3.8.1'; /* Must match Worker's APP_VERSION — auto-reload on mismatch */
 const ONPE_DIRECT = 'https://resultadoelectoral.onpe.gob.pe/presentacion-backend';
 
 /* Helper: intenta Worker primero, fallback a ONPE directo */
@@ -2073,6 +2240,20 @@ async function refreshFromONPE() {
     if (!resp1.ok) throw new Error('Half 1: HTTP ' + resp1.status);
     const snap1 = await resp1.json();
     if (snap1.error) throw new Error(snap1.error);
+
+    /* Auto-reload: if server reports a newer version, force hard refresh.
+       Covers users who stay on the page for hours using only the "Actualizar" button.
+       Safeguard: max 1 reload per 2 minutes to prevent loops if CDN hasn't propagated yet. */
+    if (snap1.appVersion && snap1.appVersion !== APP_VERSION) {
+      const lastReload = sessionStorage.getItem('_versionReload');
+      const now = Date.now();
+      if (!lastReload || (now - parseInt(lastReload)) > 120000) {
+        console.log('Version mismatch: local=' + APP_VERSION + ' server=' + snap1.appVersion + ' → reloading');
+        sessionStorage.setItem('_versionReload', now.toString());
+        location.reload(true);
+        return;
+      }
+    }
 
     setStatus('Obteniendo data (2/2)...', '');
     const resp2 = await fetch(WORKER_URL + '/api/snapshot?half=2');

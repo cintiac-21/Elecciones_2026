@@ -709,14 +709,14 @@
       <div class="pend-badge" id="pendBadge">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         <div>
-          <div class="ab-label">Pendientes</div>
+          <div class="ab-label">Actas Pendientes</div>
           <div><span class="ab-num" id="pendActas">—</span><span class="ab-pct" id="pendPct"></span></div>
         </div>
       </div>
       <div class="jee-badge" id="jeeBadge">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
         <div>
-          <div class="ab-label">En revisión JEE</div>
+          <div class="ab-label">Actas Impugnadas (JEE)</div>
           <div><span class="ab-num" id="jeeActas">—</span><span class="ab-pct" id="jeePct"></span></div>
         </div>
       </div>
@@ -2267,10 +2267,12 @@ async function refreshFromONPE() {
     const snap1 = await resp1.json();
     if (snap1.error) throw new Error(snap1.error);
 
-    /* Auto-reload: if server reports a newer version, force hard refresh.
+    /* Auto-reload: if server reports a NEWER version, force hard refresh.
        Covers users who stay on the page for hours using only the "Actualizar" button.
-       Safeguard: max 1 reload per 2 minutes to prevent loops if CDN hasn't propagated yet. */
-    if (snap1.appVersion && snap1.appVersion !== APP_VERSION) {
+       Only triggers when server > local (not when local > server, which happens
+       briefly after deploying index.html before the Worker is updated).
+       Safeguard: max 1 reload per 2 minutes to prevent loops. */
+    if (snap1.appVersion && snap1.appVersion > APP_VERSION) {
       const lastReload = sessionStorage.getItem('_versionReload');
       const now = Date.now();
       if (!lastReload || (now - parseInt(lastReload)) > 120000) {

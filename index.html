@@ -718,7 +718,7 @@
         <span id="lastUpdate">Consultando ONPE en vivo...</span>
       </div>
       <div class="hero-onpe-ts" id="onpeLastUpdate"></div>
-      <div class="hero-version">v3.9.1</div>
+      <div class="hero-version">v3.9.2</div>
     </div>
     <div class="hero-right">
       <button class="share-btn" id="shareBtn" title="Compartir">
@@ -2345,33 +2345,64 @@ async function refreshFromONPE() {
 
     /* Fetch delta-baseline for delta tracker: the snapshot BEFORE the last ONPE update.
        Unlike prev-snapshot (updates every 20min), delta-baseline only changes when
-       ONPE actually processes new actas. Non-blocking, OK to fail. */
+       ONPE actually processes new actas. Non-blocking, OK to fail.
+       FALLBACK: if delta_baseline has same votes as current (stale), scan the snapshot
+       archive for the most recent entry with different vote totals. */
     try {
+      const curCV = snap1.national?.candidateVotes || {};
+
+      /* Helper: build _prevRegionVotes from a snapshot object */
+      const buildPrev = (snapData) => {
+        const sNat = snapData.national || {};
+        const sCV = sNat.candidateVotes || {};
+        const pv = {
+          '_NATIONAL': {
+            sanch: sCV.sanch || sNat.candidates?.sanch_v || 0,
+            rla: sCV.rla || sNat.candidates?.rla_v || 0,
+            jee: sNat.enviadasJee || 0,
+            pct: sNat.pct || 0
+          }
+        };
+        (snapData.regions || []).forEach(r => {
+          if (!r.name) return;
+          pv[r.name] = {
+            sanch: r.sanch_v || Math.round((r.vv||0) * (r.sanch||0) / 100),
+            rla: r.rla_v || Math.round((r.vv||0) * (r.rla||0) / 100),
+            jee: r.enviadasJee || 0
+          };
+        });
+        return pv;
+      };
+
+      /* Try delta-baseline first */
       const prevResp = await fetch(WORKER_URL + '/api/delta-baseline');
       if (prevResp.ok) {
         const prev = await prevResp.json();
-        if (prev?.regions?.length > 0) {
-          const prevNat = prev.national || {};
-          const prevCV = prevNat.candidateVotes || {};
-          _prevRegionVotes = {
-            '_NATIONAL': {
-              sanch: prevCV.sanch || prevNat.candidates?.sanch_v || 0,
-              rla: prevCV.rla || prevNat.candidates?.rla_v || 0,
-              jee: prevNat.enviadasJee || 0,
-              pct: prevNat.pct || 0
+        const prevCV = prev?.national?.candidateVotes || {};
+        if (prev?.regions?.length > 0 && (prevCV.sanch !== curCV.sanch || prevCV.rla !== curCV.rla)) {
+          /* Baseline has different data — use it */
+          _prevRegionVotes = buildPrev(prev);
+        } else {
+          /* Baseline is stale (same as current) — scan archive for last different snapshot */
+          const archResp = await fetch(WORKER_URL + '/api/snapshots');
+          if (archResp.ok) {
+            const arch = await archResp.json();
+            const entries = arch.snapshots || [];
+            /* Scan from newest to oldest, find the first with different votes */
+            for (let i = entries.length - 1; i >= Math.max(0, entries.length - 20); i--) {
+              const snapResp = await fetch(WORKER_URL + '/api/snapshots/' + entries[i].ts);
+              if (!snapResp.ok) continue;
+              const snap = await snapResp.json();
+              const snapCV = snap?.national?.candidateVotes || {};
+              if (snap?.regions?.length > 0 && (snapCV.sanch !== curCV.sanch || snapCV.rla !== curCV.rla)) {
+                _prevRegionVotes = buildPrev(snap);
+                break;
+              }
             }
-          };
-          prev.regions.forEach(r => {
-            if (!r.name) return;
-            _prevRegionVotes[r.name] = {
-              sanch: r.sanch_v || Math.round((r.vv||0) * (r.sanch||0) / 100),
-              rla: r.rla_v || Math.round((r.vv||0) * (r.rla||0) / 100),
-              jee: r.enviadasJee || 0
-            };
-          });
+          }
         }
       }
-    } catch(e) { console.warn('[Delta] delta-baseline fetch failed:', e); }
+    } catch(e) { console.warn('[Delta] baseline fetch failed:', e); }
 
     /* Capture server-computed derived data (ghosts, hotMover, boost).
        Prefer snap2 (has full 26 regions so boost is populated). */

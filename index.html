@@ -2301,16 +2301,16 @@ async function refreshFromONPE() {
     /* 1. Update JEE + Pendientes */
     const jeeActas = snap1.national.enviadasJee || 0;
     const pendActas = snap1.national.pendientesJee || 0;
-    const totalRestante = jeeActas + pendActas;
+    const totalActas = snap1.national.totalActas || 1;
     const votosPerActa = Math.round(snap1.national.votosEmitidos / snap1.national.contabilizadas);
     const elJA = document.getElementById('jeeActas');
     const elJP = document.getElementById('jeePct');
     if (elJA) elJA.textContent = jeeActas.toLocaleString('es-PE');
-    if (elJP && totalRestante > 0) elJP.textContent = ' (' + (jeeActas / totalRestante * 100).toFixed(1) + '%)';
+    if (elJP) elJP.textContent = ' (' + (jeeActas / totalActas * 100).toFixed(1) + '%)';
     const elPA = document.getElementById('pendActas');
     const elPP = document.getElementById('pendPct');
     if (elPA) elPA.textContent = pendActas.toLocaleString('es-PE');
-    if (elPP && totalRestante > 0) elPP.textContent = ' (' + (pendActas / totalRestante * 100).toFixed(1) + '%)';
+    if (elPP) elPP.textContent = ' (' + (pendActas / totalActas * 100).toFixed(1) + '%)';
 
     /* 2. Update tracking */
     const lastCut = TRACKING.cuts[TRACKING.cuts.length - 1];
@@ -2764,17 +2764,17 @@ function updateJeeData(natData) {
   const d = natData.data;
   const jeeActas = d.enviadasJee || 0;
   const pendActas = d.pendientesJee || 0;
-  const totalRestante = jeeActas + pendActas;
+  const totalActas = d.totalActas || 1;
 
   const elJA = document.getElementById('jeeActas');
   const elJP = document.getElementById('jeePct');
   if (elJA) elJA.textContent = jeeActas.toLocaleString('es-PE');
-  if (elJP && totalRestante > 0) elJP.textContent = ' (' + (jeeActas / totalRestante * 100).toFixed(1) + '%)';
+  if (elJP) elJP.textContent = ' (' + (jeeActas / totalActas * 100).toFixed(1) + '%)';
 
   const elPA = document.getElementById('pendActas');
   const elPP = document.getElementById('pendPct');
   if (elPA) elPA.textContent = pendActas.toLocaleString('es-PE');
-  if (elPP && totalRestante > 0) elPP.textContent = ' (' + (pendActas / totalRestante * 100).toFixed(1) + '%)';
+  if (elPP) elPP.textContent = ' (' + (pendActas / totalActas * 100).toFixed(1) + '%)';
 }
 
 /* Start auto-refresh if Worker is configured */

@@ -2092,7 +2092,6 @@ function renderTrackingChart() {
    Proxy para la API de ONPE vía Cloudflare Worker.
    El Worker agrega CORS, cachea respuestas y split-fetches
    para mantenerse dentro del free tier (50 subrequests).
-   — Renzo Núñez Berdejo
 ══════════════════════════════════════════════════════════ */
 const WORKER_URL = 'https://onpe-proxy.renzonunez-af.workers.dev';
 const APP_VERSION = 'v3.8.2'; /* Must match Worker's APP_VERSION — auto-reload on mismatch */

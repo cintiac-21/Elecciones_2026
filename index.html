@@ -531,6 +531,35 @@
     .refresh-status.ok{color:var(--c-nieto)}.refresh-status.err{color:var(--c-sanch)}
 
     /* ══════════════ 12b. STATUS BAR ══════════════ */
+
+    /* ══════════════ 12c. DELTA TRACKER ══════════════ */
+    .delta-tracker{display:none;background:var(--bg-card);border:1px solid var(--border);
+      border-radius:var(--radius);padding:14px 16px;margin-bottom:16px}
+    .delta-tracker.visible{display:block}
+    .delta-title{font-size:12px;font-weight:600;color:var(--tx2);text-transform:uppercase;
+      letter-spacing:.8px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+    .delta-title svg{color:var(--tx3);opacity:.6}
+    .delta-summary{display:flex;gap:16px;margin-bottom:10px;flex-wrap:wrap;justify-content:center}
+    .delta-stat{display:flex;align-items:baseline;gap:6px;font-family:'DM Mono',monospace;font-size:13px}
+    .delta-stat .ds-label{font-size:11px;color:var(--tx3);font-family:'DM Sans',sans-serif}
+    .delta-stat .ds-val{font-weight:700;font-size:15px}
+    .delta-table{width:100%;border-collapse:collapse;font-size:12px}
+    .delta-table th{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;
+      color:var(--tx3);text-align:right;padding:4px 8px;border-bottom:1px solid var(--border)}
+    .delta-table th:first-child{text-align:left}
+    .delta-table td{padding:4px 8px;text-align:right;font-family:'DM Mono',monospace;
+      border-bottom:1px solid rgba(255,255,255,.03)}
+    .delta-table td:first-child{text-align:left;font-family:'DM Sans',sans-serif;color:var(--tx2)}
+    .delta-table tr:last-child td{border-bottom:none;font-weight:700;padding-top:8px;
+      border-top:1px solid var(--border)}
+    .delta-table .dt-pos{color:var(--c-nieto)}.delta-table .dt-neg{color:var(--c-sanch)}
+    .delta-table .dt-sanch{color:var(--c-sanch)}.delta-table .dt-rla{color:var(--c-rla)}
+    @media(max-width:600px){
+      .delta-tracker{padding:10px 12px}
+      .delta-table{font-size:11px}
+      .delta-summary{gap:10px}
+    }
+
     .status-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;
       margin-bottom:12px;padding:10px 14px;background:var(--bg-card);border:1px solid var(--border);
       border-radius:8px;opacity:0;animation:fadeUp .5s ease .3s forwards}
@@ -753,6 +782,21 @@
 
     <!-- KPIs: Top 5 candidates (rendered dynamically, sorted by %) -->
     <div class="kpis" id="kpiCandidates"></div>
+
+    <!-- Delta Tracker: per-region vote movement analysis -->
+    <div class="delta-tracker" id="deltaTracker">
+      <div class="delta-title">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+        <span>¡Nuevo! — Análisis al detalle de <span style="color:var(--c-sanch)">Sánchez</span> vs <span style="color:var(--c-rla)">López Aliaga</span> <span style="font-size:10px;color:var(--tx3);text-transform:none;letter-spacing:0">(cambios desde ONPE 93.064%)</span></span>
+      </div>
+      <div class="delta-summary" id="deltaSummary"></div>
+      <table class="delta-table">
+        <thead>
+          <tr><th>Región</th><th style="color:var(--c-sanch)">Sánchez</th><th style="color:var(--c-rla)">López Aliaga</th><th>Neto</th><th style="color:var(--c-fuji)">→ JEE</th></tr>
+        </thead>
+        <tbody id="deltaBody"></tbody>
+      </table>
+    </div>
 
     <!-- Overtake ticker: shown when a candidate surpasses another -->
     <div class="overtake-ticker" id="overtakeTicker">
@@ -1035,6 +1079,36 @@ let _kvPrevCandidates = null;
 /* Server-computed derived data: { ghosts, hotMover, boost } — same for all clients */
 let _serverDerived = null;
 let _jeeRate = 1.0; /* Dynamic JEE acceptance rate — updated by runProjection() */
+/* Delta tracker baseline: exact votes from ONPE CSV at 93.064% (16/04/2026 18:04)
+   The delta tracker shows changes since this snapshot. */
+let _prevRegionVotes = {
+  'Amazonas':{sanch:55364,rla:5712,jee:81},
+  'Áncash':{sanch:74268,rla:29864,jee:241},
+  'Apurímac':{sanch:79276,rla:6120,jee:47},
+  'Arequipa':{sanch:86616,rla:91660,jee:75},
+  'Ayacucho':{sanch:84615,rla:7406,jee:92},
+  'Cajamarca':{sanch:254121,rla:19744,jee:238},
+  'Callao':{sanch:16603,rla:82814,jee:126},
+  'Cusco':{sanch:141194,rla:31378,jee:77},
+  'Extranjero':{sanch:5336,rla:55496,jee:499},
+  'Huancavelica':{sanch:71344,rla:3862,jee:45},
+  'Huánuco':{sanch:92102,rla:18704,jee:211},
+  'Ica':{sanch:33740,rla:41237,jee:230},
+  'Junín':{sanch:74298,rla:46246,jee:171},
+  'La Libertad':{sanch:81396,rla:71258,jee:389},
+  'Lambayeque':{sanch:67862,rla:54753,jee:168},
+  'Lima':{sanch:189304,rla:1154017,jee:1179},
+  'Loreto':{sanch:28599,rla:19549,jee:397},
+  'Madre de Dios':{sanch:16809,rla:2459,jee:54},
+  'Moquegua':{sanch:13912,rla:6313,jee:29},
+  'Pasco':{sanch:20261,rla:7028,jee:55},
+  'Piura':{sanch:91995,rla:54199,jee:428},
+  'Puno':{sanch:156816,rla:12139,jee:102},
+  'San Martín':{sanch:86916,rla:21517,jee:162},
+  'Tacna':{sanch:24961,rla:13051,jee:52},
+  'Tumbes':{sanch:6916,rla:5956,jee:59},
+  'Ucayali':{sanch:25708,rla:11302,jee:186}
+};
 /* Current national vote totals from ONPE snapshot — source of truth for real vote gaps */
 let _currentNational = null;
 let _currentCandidateVotes = null;
@@ -1722,6 +1796,7 @@ async function renderWithEmbeddedData() {
     }));
     await renderMap('mapOnpe', onpeMapData, 'ONPE parcial');
     updateVoteCounters();
+    updateDeltaTracker();
   } catch(err) {
     console.error('Map error:', err);
     document.getElementById('mapOnpe').innerHTML = '<p style="color:var(--c-sanch);padding:20px;text-align:center">Error: '+err.message+'</p>';
@@ -2331,9 +2406,24 @@ async function refreshFromONPE() {
     /* If natPct < lastCut.pct, ignore (ONPE counter went backward, JEE noise) */
     /* Note: highlightHotMover moved after renderKPIs below */
 
-    /* 3. Update regions (prev snapshot comes from KV, not client-side) */
+    /* 3. Update regions */
     ONPE_REGIONS.length = 0;
     allRegions.forEach(r => ONPE_REGIONS.push(r));
+
+    /* 3b. Delta tracker: on FIRST refresh, save Worker data as baseline.
+       On subsequent refreshes, _prevRegionVotes stays as the previous Worker data.
+       This ensures the delta is always between two Worker snapshots, never vs embedded. */
+    if (!_prevRegionVotes) {
+      _prevRegionVotes = {};
+      ONPE_REGIONS.forEach(r => {
+        if (!r.name) return;
+        _prevRegionVotes[r.name] = {
+          sanch: Math.round((r.vv || 0) * (r.sanch || 0) / 100),
+          rla: Math.round((r.vv || 0) * (r.rla || 0) / 100),
+          jee: r.enviadasJee || 0
+        };
+      });
+    }
 
     /* 4. Run projection + re-render probability bars */
     const { finals: projection, vvNational } = runProjection(ONPE_REGIONS, pendActas);
@@ -2412,6 +2502,7 @@ async function refreshFromONPE() {
     renderTrackingChart();
     updateExtranjero();
     updateVoteCounters();
+    updateDeltaTracker();
     document.querySelectorAll('.skel').forEach(s => s.remove());
 
     setStatus('✓ ONPE ' + natPct.toFixed(2) + '% · ' + allRegions.length + ' reg · Proyección recalculada', 'ok');
@@ -2745,6 +2836,116 @@ function updateProjectionUI(projection, probs, vvNational) {
     ipsosTag.className = 'tag ' + (ipsosMatch ? 'ok' : 'err');
     ipsosTag.textContent = ipsosMatch ? '2° lugar coincide ✓' : '2° lugar difiere: ' + labelMap[proj2nd] + ' ✗';
   }
+}
+
+/* ══════════════════════════════════════════════════════════
+   §11b  DELTA TRACKER — Per-region vote changes between snapshots
+   Shows exactly where Sánchez and RLA gained/lost votes
+   between the previous and current ONPE update.
+   — Renzo Núñez Berdejo
+══════════════════════════════════════════════════════════ */
+function updateDeltaTracker() {
+  const tracker = document.getElementById('deltaTracker');
+  const body = document.getElementById('deltaBody');
+  const summary = document.getElementById('deltaSummary');
+  if (!tracker || !body) return;
+
+  /* Always show the tracker frame */
+  tracker.classList.add('visible');
+
+  /* No prev data yet — first refresh sets the baseline */
+  if (!_prevRegionVotes) {
+    summary.innerHTML = '<div class="delta-stat"><span class="ds-label">Esperando datos de ONPE para comparar...</span></div>';
+    body.innerHTML = '';
+    return;
+  }
+
+  /* Compute per-region deltas: votes + JEE */
+  const deltas = [];
+  let totalDS = 0, totalDR = 0, totalJee = 0;
+
+  ONPE_REGIONS.forEach(r => {
+    if (!r.name) return;
+    const prev = _prevRegionVotes[r.name];
+    if (!prev) return;
+
+    const nowS = Math.round((r.vv || 0) * (r.sanch || 0) / 100);
+    const nowR = Math.round((r.vv || 0) * (r.rla || 0) / 100);
+    const nowJee = r.enviadasJee || 0;
+    const dS = nowS - (prev.sanch || 0);
+    const dR = nowR - (prev.rla || 0);
+    const dJee = nowJee - (prev.jee || 0);
+
+    if (dS !== 0 || dR !== 0 || dJee !== 0) {
+      deltas.push({ name: r.name, dS, dR, net: dS - dR, dJee });
+      totalDS += dS;
+      totalDR += dR;
+      totalJee += dJee;
+    }
+  });
+
+  /* No changes detected */
+  if (deltas.length === 0) {
+    summary.innerHTML = '<div class="delta-stat"><span class="ds-label">ONPE no ha actualizado datos desde que se abrió la página. Los cambios aparecerán automáticamente.</span></div>';
+    body.innerHTML = '';
+    return;
+  }
+
+  /* Sort by absolute net impact */
+  deltas.sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
+
+  /* Show all regions with any movement (filter tiny rounding noise only) */
+  const significant = deltas.filter(d => Math.abs(d.dS) >= 5 || Math.abs(d.dR) >= 5 || Math.abs(d.dJee) >= 1);
+
+  /* Summary bar */
+  const totalNet = totalDS - totalDR;
+  const netColor = totalNet > 0 ? 'var(--c-sanch)' : 'var(--c-rla)';
+  const netLabel = totalNet > 0 ? 'Sánchez' : 'López Aliaga';
+  const jeeHtml = totalJee !== 0
+    ? `<div class="delta-stat"><span class="ds-label">→ JEE:</span><span class="ds-val" style="color:var(--c-fuji)">${totalJee > 0 ? '+' : ''}${totalJee.toLocaleString('es-PE')}</span></div>`
+    : '';
+  summary.innerHTML = `
+    <div class="delta-stat">
+      <span class="ds-label">Sánchez:</span>
+      <span class="ds-val dt-sanch">${totalDS > 0 ? '+' : ''}${totalDS.toLocaleString('es-PE')}</span>
+    </div>
+    <div class="delta-stat">
+      <span class="ds-label">López Aliaga:</span>
+      <span class="ds-val dt-rla">${totalDR > 0 ? '+' : ''}${totalDR.toLocaleString('es-PE')}</span>
+    </div>
+    <div class="delta-stat">
+      <span class="ds-label">Neto:</span>
+      <span class="ds-val" style="color:${netColor}">${totalNet > 0 ? '+' : ''}${totalNet.toLocaleString('es-PE')} ${netLabel}</span>
+    </div>
+    ${jeeHtml}`;
+
+  /* Table rows */
+  let rows = '';
+  significant.forEach(d => {
+    const netCls = d.net > 0 ? 'dt-pos' : d.net < 0 ? 'dt-neg' : '';
+    const netSign = d.net > 0 ? '+' : '';
+    const jeeStr = d.dJee !== 0 ? `<span style="color:var(--c-fuji)">${d.dJee > 0 ? '+' : ''}${d.dJee}</span>` : '—';
+    rows += `<tr>
+      <td>${d.name}</td>
+      <td class="dt-sanch">${d.dS > 0 ? '+' : ''}${d.dS.toLocaleString('es-PE')}</td>
+      <td class="dt-rla">${d.dR > 0 ? '+' : ''}${d.dR.toLocaleString('es-PE')}</td>
+      <td class="${netCls}">${netSign}${d.net.toLocaleString('es-PE')}</td>
+      <td>${jeeStr}</td>
+    </tr>`;
+  });
+
+  /* Total row */
+  const totalNetCls = totalNet > 0 ? 'dt-pos' : 'dt-neg';
+  const totalJeeStr = totalJee !== 0 ? `<span style="color:var(--c-fuji)">${totalJee > 0 ? '+' : ''}${totalJee.toLocaleString('es-PE')}</span>` : '—';
+  rows += `<tr>
+    <td>TOTAL</td>
+    <td class="dt-sanch">${totalDS > 0 ? '+' : ''}${totalDS.toLocaleString('es-PE')}</td>
+    <td class="dt-rla">${totalDR > 0 ? '+' : ''}${totalDR.toLocaleString('es-PE')}</td>
+    <td class="${totalNetCls}">${totalNet > 0 ? '+' : ''}${totalNet.toLocaleString('es-PE')}</td>
+    <td>${totalJeeStr}</td>
+  </tr>`;
+
+  body.innerHTML = rows;
 }
 
 /* ══════════════════════════════════════════════════════════

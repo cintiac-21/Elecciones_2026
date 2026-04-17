@@ -718,7 +718,7 @@
         <span id="lastUpdate">Consultando ONPE en vivo...</span>
       </div>
       <div class="hero-onpe-ts" id="onpeLastUpdate"></div>
-      <div class="hero-version">v3.9.3</div>
+      <div class="hero-version">v3.9.4</div>
     </div>
     <div class="hero-right">
       <button class="share-btn" id="shareBtn" title="Compartir">
@@ -2360,7 +2360,8 @@ async function refreshFromONPE() {
             sanch: sCV.sanch || sNat.candidates?.sanch_v || 0,
             rla: sCV.rla || sNat.candidates?.rla_v || 0,
             jee: sNat.enviadasJee || 0,
-            pct: sNat.pct || 0
+            pct: sNat.pct || 0,
+            ts: snapData.timestamp || null
           }
         };
         (snapData.regions || []).forEach(r => {
@@ -2900,7 +2901,16 @@ function updateDeltaTracker() {
   /* Update subtitle with prev snapshot % */
   const prevPct = _prevRegionVotes['_NATIONAL']?.pct;
   const baseEl = document.getElementById('deltaBaseline');
-  if (baseEl && prevPct) baseEl.textContent = '(cambios desde ONPE ' + Number(prevPct).toFixed(3) + '%)';
+  if (baseEl && prevPct) {
+    let label = '(cambios desde ONPE ' + Number(prevPct).toFixed(3) + '%';
+    const prevTs = _prevRegionVotes['_NATIONAL']?.ts;
+    if (prevTs) {
+      const d = new Date(prevTs);
+      const h = d.toLocaleTimeString('es-PE', {timeZone:'America/Lima', hour:'2-digit', minute:'2-digit', hour12:true});
+      label += ' · ' + h;
+    }
+    baseEl.textContent = label + ')';
+  }
 
   /* Compute per-region deltas: votes + JEE */
   const deltas = [];

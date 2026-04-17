@@ -174,18 +174,21 @@
       margin:0 auto 14px;padding:10px 20px;width:max-content;max-width:calc(100% - 32px);
       background:rgba(232,148,58,0.08);border:1px solid rgba(232,148,58,0.35);
       border-radius:10px;font-size:13px;font-weight:600;color:var(--c-fuji);
-      letter-spacing:0.01em;animation:staleGlow 2.4s ease-in-out infinite}
+      letter-spacing:0.01em;animation:staleBeat 2s ease-in-out infinite}
     .stale-banner.visible{display:flex}
     .stale-dot{width:9px;height:9px;border-radius:50%;background:var(--c-fuji);
-      animation:staleDotPulse 1.6s ease-in-out infinite;box-shadow:0 0 0 0 rgba(232,148,58,0.5)}
+      animation:staleDotPulse 1.4s ease-in-out infinite;box-shadow:0 0 0 0 rgba(232,148,58,0.5)}
     .stale-text{line-height:1}
-    @keyframes staleGlow{
-      0%,100%{box-shadow:0 0 0 0 rgba(232,148,58,0), 0 0 12px rgba(232,148,58,0.08)}
-      50%{box-shadow:0 0 0 4px rgba(232,148,58,0), 0 0 20px rgba(232,148,58,0.22)}
+    @keyframes staleBeat{
+      0%,100%{transform:scale(1);box-shadow:0 0 8px rgba(232,148,58,0.06)}
+      15%{transform:scale(1.04);box-shadow:0 0 18px rgba(232,148,58,0.25)}
+      30%{transform:scale(1);box-shadow:0 0 8px rgba(232,148,58,0.06)}
+      45%{transform:scale(1.03);box-shadow:0 0 14px rgba(232,148,58,0.18)}
+      60%{transform:scale(1);box-shadow:0 0 8px rgba(232,148,58,0.06)}
     }
     @keyframes staleDotPulse{
-      0%,100%{box-shadow:0 0 0 0 rgba(232,148,58,0.55);opacity:1}
-      50%{box-shadow:0 0 0 8px rgba(232,148,58,0);opacity:0.6}
+      0%,100%{box-shadow:0 0 0 0 rgba(232,148,58,0.6);opacity:1}
+      50%{box-shadow:0 0 0 8px rgba(232,148,58,0);opacity:0.5}
     }
 
     /* Overtake ticker — shown when a candidate surpasses another */
@@ -531,15 +534,19 @@
     .status-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;
       margin-bottom:12px;padding:8px 14px;background:var(--bg-card);border:1px solid var(--border);
       border-radius:8px;opacity:0;animation:fadeUp .5s ease .3s forwards}
-    .status-bar-left,.status-bar-right{display:flex;align-items:center;gap:8px}
-    .jee-badge,.timer-badge{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--tx2)}
+    .status-bar-left,.status-bar-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .jee-badge,.timer-badge,.pend-badge{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--tx2)}
+    .pend-badge svg{color:#E04848;opacity:.8}
+    .pend-badge strong{color:#F09595;font-family:'DM Mono',monospace}
+    .pend-badge .pend-pct{font-size:10px;color:#E04848;opacity:.7;margin-left:1px}
     .jee-badge svg{color:var(--c-fuji);opacity:.7}
     .jee-badge strong{color:var(--tx1);font-family:'DM Mono',monospace}
+    .jee-badge .jee-pct{font-size:10px;color:var(--c-fuji);opacity:.7;margin-left:1px}
     .timer-badge svg{color:var(--c-nieto);opacity:.7}
     .timer-badge strong{color:var(--c-nieto);font-family:'DM Mono',monospace;min-width:32px}
     @media(max-width:600px){
       .status-bar{flex-direction:column;align-items:flex-start;gap:4px;padding:6px 10px}
-      .jee-badge,.timer-badge{font-size:10px}
+      .jee-badge,.timer-badge,.pend-badge{font-size:10px}
     }
 
     /* ══════════════════════════════════════════
@@ -690,9 +697,13 @@
   <!-- ══════════════ STATUS BAR: JEE + TIMER ══════════════ -->
   <div class="status-bar">
     <div class="status-bar-left">
+      <div class="pend-badge" id="pendBadge">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span>Pendientes: <strong id="pendActas">—</strong><span class="pend-pct" id="pendPct"></span></span>
+      </div>
       <div class="jee-badge" id="jeeBadge">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-        <span>JEE: <strong id="jeeActas">—</strong> actas en revisión · <strong id="jeeVotos">—</strong> votos</span>
+        <span>En revisión JEE: <strong id="jeeActas">—</strong><span class="jee-pct" id="jeePct"></span></span>
       </div>
     </div>
     <div class="status-bar-right">
@@ -722,7 +733,7 @@
     <!-- Stale data banner: shown when ONPE hasn't updated in >30min -->
     <div class="stale-banner" id="staleBanner">
       <span class="stale-dot"></span>
-      <span class="stale-text">Esperando actualizaciones de la ONPE</span>
+      <span class="stale-text">Esperando a que ONPE actualice Data</span>
     </div>
 
     <!-- KPIs: Top 5 candidates (rendered dynamically, sorted by %) -->
@@ -2272,13 +2283,19 @@ async function refreshFromONPE() {
        Prefer snap2 (has full 26 regions so boost is populated). */
     _serverDerived = snap2.derived || snap1.derived || null;
 
-    /* 1. Update JEE */
+    /* 1. Update JEE + Pendientes */
     const jeeActas = snap1.national.enviadasJee || 0;
+    const pendActas = snap1.national.pendientesJee || 0;
+    const totalRestante = jeeActas + pendActas;
     const votosPerActa = Math.round(snap1.national.votosEmitidos / snap1.national.contabilizadas);
     const elJA = document.getElementById('jeeActas');
-    const elJV = document.getElementById('jeeVotos');
+    const elJP = document.getElementById('jeePct');
     if (elJA) elJA.textContent = jeeActas.toLocaleString('es-PE');
-    if (elJV) elJV.textContent = '~' + (jeeActas * votosPerActa).toLocaleString('es-PE');
+    if (elJP && totalRestante > 0) elJP.textContent = ' (' + (jeeActas / totalRestante * 100).toFixed(1) + '%)';
+    const elPA = document.getElementById('pendActas');
+    const elPP = document.getElementById('pendPct');
+    if (elPA) elPA.textContent = pendActas.toLocaleString('es-PE');
+    if (elPP && totalRestante > 0) elPP.textContent = ' (' + (pendActas / totalRestante * 100).toFixed(1) + '%)';
 
     /* 2. Update tracking */
     const lastCut = TRACKING.cuts[TRACKING.cuts.length - 1];
@@ -2726,20 +2743,23 @@ function startCountdown() {
   }, 1000);
 }
 
-/* Update JEE data from national totals */
+/* Update JEE + Pendientes data from national totals */
 function updateJeeData(natData) {
   if (!natData || !natData.data) return;
   const d = natData.data;
   const jeeActas = d.enviadasJee || 0;
-  const contabilizadas = d.contabilizadas || 1;
-  const votosEmitidos = d.totalVotosEmitidos || 0;
-  const votosPerActa = Math.round(votosEmitidos / contabilizadas);
-  const jeeVotos = jeeActas * votosPerActa;
+  const pendActas = d.pendientesJee || 0;
+  const totalRestante = jeeActas + pendActas;
 
-  const elActas = document.getElementById('jeeActas');
-  const elVotos = document.getElementById('jeeVotos');
-  if (elActas) elActas.textContent = jeeActas.toLocaleString('es-PE');
-  if (elVotos) elVotos.textContent = '~' + jeeVotos.toLocaleString('es-PE');
+  const elJA = document.getElementById('jeeActas');
+  const elJP = document.getElementById('jeePct');
+  if (elJA) elJA.textContent = jeeActas.toLocaleString('es-PE');
+  if (elJP && totalRestante > 0) elJP.textContent = ' (' + (jeeActas / totalRestante * 100).toFixed(1) + '%)';
+
+  const elPA = document.getElementById('pendActas');
+  const elPP = document.getElementById('pendPct');
+  if (elPA) elPA.textContent = pendActas.toLocaleString('es-PE');
+  if (elPP && totalRestante > 0) elPP.textContent = ' (' + (pendActas / totalRestante * 100).toFixed(1) + '%)';
 }
 
 /* Start auto-refresh if Worker is configured */

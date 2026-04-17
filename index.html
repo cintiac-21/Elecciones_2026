@@ -767,7 +767,7 @@
 
     <!-- Probability of passing to second round -->
     <div class="prob-section">
-      <div class="prob-title">Probabilidad de pase a segunda vuelta <span class="prob-new">Se enfría el impulso rural. Ganan peso las actas observadas.</span></div>
+      <div class="prob-title">Probabilidad de pase a segunda vuelta <span class="prob-new">Definición por centenas de votos. Actas impugnadas son clave.</span></div>
       <div class="prob-bars" id="probBars"></div>
     </div>
 
@@ -1034,6 +1034,7 @@ let _prevRegions = null;
 let _kvPrevCandidates = null;
 /* Server-computed derived data: { ghosts, hotMover, boost } — same for all clients */
 let _serverDerived = null;
+let _jeeRate = 1.0; /* Dynamic JEE acceptance rate — updated by runProjection() */
 /* Current national vote totals from ONPE snapshot — source of truth for real vote gaps */
 let _currentNational = null;
 let _currentCandidateVotes = null;
@@ -1598,7 +1599,7 @@ function updateVoteCounters() {
       const avg = r.vv / r.contabilizadas;
       const jee = r.enviadasJee || 0;
       const puras = r.totalActas - r.contabilizadas - jee;
-      totalEst += r.vv + puras * avg + jee * avg * 0.85;
+      totalEst += r.vv + puras * avg + jee * avg * _jeeRate;
     } else {
       totalEst += Math.round(r.vv / (r.pct / 100));
     }
@@ -1772,7 +1773,7 @@ function showModal(regionName, data, source) {
       const avg = data.vv / data.contabilizadas;
       const jee = data.enviadasJee || 0;
       const puras = data.totalActas - data.contabilizadas - jee;
-      vvPend = Math.round(puras * avg + jee * avg * 0.85);
+      vvPend = Math.round(puras * avg + jee * avg * _jeeRate);
     } else {
       const vvTotal = Math.round(data.vv / (data.pct / 100));
       vvPend = vvTotal - data.vv;
@@ -2335,9 +2336,9 @@ async function refreshFromONPE() {
     allRegions.forEach(r => ONPE_REGIONS.push(r));
 
     /* 4. Run projection + re-render probability bars */
-    const { finals: projection, vvNational } = runProjection(ONPE_REGIONS);
+    const { finals: projection, vvNational } = runProjection(ONPE_REGIONS, pendActas);
     const probs = calcProbabilities(projection, natPct);
-    renderProbBars(probs); /* Re-sort prob bars by probability */
+    renderProbBars(probs);
     updateProjectionUI(projection, probs, vvNational);
 
     /* 5. Hero count-up */
@@ -2441,11 +2442,15 @@ async function refreshFromONPE() {
 /* ══════════════════════════════════════════════════════════
    §9  MOTOR DE PROYECCIÓN
    Estima resultados finales a partir de la data regional parcial.
-   Aplica factores de ajuste rural por nivel de conteo.
-   El boost de Sánchez solo se aplica a actas pendientes puras, no a JEE.
+   Separa actas pendientes puras (rurales) de actas JEE (impugnadas):
+   - PURAS: aplica factores marginales empíricos (boost rural para Sánchez,
+     factor de ajuste para RLA). Observados entre 80-88% del conteo.
+   - JEE: usa porcentajes regionales actuales SIN factores de ajuste.
+     Las actas impugnadas no son votos rurales tardíos — su composición
+     es diferente y los factores marginales no aplican.
    — Renzo Núñez Berdejo
 ══════════════════════════════════════════════════════════ */
-function runProjection(regions) {
+function runProjection(regions, nationalPendientesJee) {
   const KEYS = ['fuji','rla','nieto','belm','sanch'];
 
   /*
@@ -2480,6 +2485,20 @@ function runProjection(regions) {
   const totPend = [0,0,0,0,0];
   let totalVV = 0;
 
+  /* Dynamic JEE acceptance rate — computed from ONPE national data.
+     nullified = totalActas - contabilizadas - enviadasJee - pendientesJee
+     When nullified > 0, JEE has started rejecting actas.
+     jeeRate = 1 - (nullified / JEE resolved so far).
+     When no nullifications yet (current state at 93%) → jeeRate = 1.0 */
+  const sumTotal = regions.reduce((s,r) => s + (r.totalActas || 0), 0);
+  const sumContab = regions.reduce((s,r) => s + (r.contabilizadas || 0), 0);
+  const sumJee = regions.reduce((s,r) => s + (r.enviadasJee || 0), 0);
+  const pendPuras = typeof nationalPendientesJee === 'number' ? nationalPendientesJee : Math.max(0, sumTotal - sumContab - sumJee);
+  const nullified = Math.max(0, sumTotal - sumContab - sumJee - pendPuras);
+  const jeeResolved = nullified > 0 ? Math.max(1, nullified + (sumContab - (sumTotal - sumJee - pendPuras))) : 0;
+  const jeeRate = nullified > 0 ? Math.max(0.5, 1 - (nullified / Math.max(1, jeeResolved))) : 1.0;
+  _jeeRate = jeeRate; /* Update global so UI functions can read it */
+
   /*
    * Extranjero special: estimate using padrón electoral + historical participation.
    * Domestic regions: use exact integer acta counts from ONPE API.
@@ -2512,7 +2531,7 @@ function runProjection(regions) {
       const jee = r.enviadasJee || 0;
       const actasPuras = Math.max(0, r.totalActas - r.contabilizadas - jee);
       const vvPuras = actasPuras * avgVVperActa;
-      const vvJee = jee * avgVVperActa * 0.85;
+      const vvJee = jee * avgVVperActa * jeeRate;
       vvPend = vvPuras + vvJee;
       r._projAvgVV = avgVVperActa;
       r._projVvPuras = vvPuras;
@@ -2545,19 +2564,28 @@ function runProjection(regions) {
 
     const vvPuras = r._projVvPuras || 0;
     const vvJee = r._projVvJee || 0;
-    const pureShare = (vvPuras + vvJee) > 0 ? (vvPuras / (vvPuras + vvJee)) : 0;
-    const sanEff = 1.0 + (sanF - 1.0) * Math.sqrt(pureShare);
 
-    /* Neutral for all candidates by default */
-    totPend[0] += vvPend * (pcts[0] / 100);                /* Fujimori */
-    totPend[2] += vvPend * (pcts[2] / 100);                /* Nieto */
-    totPend[3] += vvPend * (pcts[3] / 100);                /* Belmont */
+    /* ═══ PURE PENDING (rural, last-mile actas) ═══
+       Apply empirical marginal factors — these were observed in late-counted
+       rural votes and only apply to actas still pending in the field. */
+    totPend[0] += vvPuras * (pcts[0] / 100);                /* Fujimori — neutral */
+    totPend[1] += vvPuras * (pcts[1] / 100) * rlaF;         /* RLA — marginal factor */
+    totPend[2] += vvPuras * (pcts[2] / 100);                /* Nieto — neutral */
+    totPend[3] += vvPuras * (pcts[3] / 100);                /* Belmont — neutral */
+    totPend[4] += vvPuras * (pcts[4] / 100) * sanF;         /* Sánchez — rural boost */
 
-    /* RLA keeps regional empirical factor across remaining actas */
-    totPend[1] += vvPend * (pcts[1] / 100) * rlaF;
+    /* ═══ JEE (impugned actas) ═══
+       Use current regional percentages AS-IS. No marginal factors applied —
+       JEE actas are contested votes, NOT late-counted rural votes.
+       Each region's composition naturally weights itself:
+       Lima JEE → 20% RLA, 3% Sánchez (massive RLA advantage)
+       Cajamarca JEE → 3% RLA, 42% Sánchez (Sánchez stronghold) */
+    totPend[0] += vvJee * (pcts[0] / 100);                  /* Fujimori — neutral */
+    totPend[1] += vvJee * (pcts[1] / 100);                  /* RLA — neutral (THE FIX) */
+    totPend[2] += vvJee * (pcts[2] / 100);                  /* Nieto — neutral */
+    totPend[3] += vvJee * (pcts[3] / 100);                  /* Belmont — neutral */
+    totPend[4] += vvJee * (pcts[4] / 100);                  /* Sánchez — neutral */
 
-    /* Sánchez boost fades smoothly as pure pending actas disappear and JEE dominates */
-    totPend[4] += vvPend * (pcts[4] / 100) * sanEff;
     totalVV += r.vv;
   });
 
@@ -2599,27 +2627,25 @@ function runProjection(regions) {
 ══════════════════════════════════════════════════════════ */
 function calcProbabilities(projection, nationalPct) {
   /*
-   * Uses the projected % from runProjection directly (which already includes
-   * trend-adjusted rural factors). No separate trend calculation — this ensures
-   * the probability bars are perfectly consistent with the projection table.
+   * Uses the projected % from runProjection directly.
    * Sigmoid converts projected margins into probabilities.
+   * When top-2 candidates are within 0.5pp, the margin is dampened
+   * so probabilities stay close (reflecting true uncertainty).
    */
   const contenders = projection.filter(p => p.key !== 'fuji');
   if (contenders.length < 2) return {};
 
   const pct = Math.max(50, nationalPct || 75);
 
-  /* Steepness scales with counting progress: more counted = more certain */
-  const steepness = 1.0 + pct / 100; /* 50%→1.5, 75%→1.75, 90%→1.9, 95%→1.95 */
+  /* Steepness scales with counting progress */
+  const steepness = 1.0 + pct / 100;
 
-  /* Sort by projected % (already sorted from runProjection, but be safe) */
   const sorted = [...contenders].sort((a, b) => b.pct - a.pct);
   const leader = sorted[0];
   const probs = {};
 
   sorted.forEach(c => {
     const marginToLeader = leader.pct - c.pct;
-    /* Sigmoid: leader gets ~50%, others drop off based on their gap */
     const prob = 1 / (1 + Math.exp(steepness * marginToLeader));
     probs[c.key] = Math.max(1, prob * 100);
   });

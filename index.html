@@ -1,84 +1,75 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <!--
-  ╔════════════════════════════════════════════════════════════════╗
-  ║  PERÚ ELIGE 2026 — Dashboard Electoral Interactivo           ║
-  ║  Seguimiento en vivo del conteo oficial ONPE                 ║
-  ║  con proyección al 100% y conteo rápido Datum                ║
-  ╠════════════════════════════════════════════════════════════════╣
-  ║  Autor:     Renzo Núñez Berdejo                              ║
-  ║  Versión:   v44 — abril 2026                                 ║
-  ║  Fuentes:   ONPE (resultadoelectoral.onpe.gob.pe)            ║
-  ║             Datum Internacional (América TV / Canal N)       ║
-  ║             Ipsos Perú                                       ║
-  ║  Stack:     HTML/CSS/JS · D3.js · Chart.js · Cloudflare      ║
-  ║  Repo:      github.com/renzonunezaf/Elecciones_2026          ║
-  ╚════════════════════════════════════════════════════════════════╝
-  -->
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Perú Elige 2026 — Dashboard Electoral</title>
-  <meta property="og:title" content="Perú Elige 2026 — Dashboard Electoral Interactivo">
-  <meta property="og:description" content="Tracking en vivo del conteo ONPE con proyección al 100% y comparación con Datum e Ipsos.">
-  <meta property="og:image" content="https://renzonunezaf.github.io/Elecciones_2026/og-preview.png">
-  <meta property="og:image:width" content="1492">
-  <meta property="og:image:height" content="1628">
-  <meta property="og:image:type" content="image/png">
-  <meta property="og:url" content="https://renzonunezaf.github.io/Elecciones_2026/">
-  <meta property="og:type" content="website">
-  <meta property="og:site_name" content="Perú Elige 2026">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Perú Elige 2026 — Dashboard Electoral Interactivo">
-  <meta name="twitter:description" content="Tracking en vivo del conteo ONPE con proyección al 100%.">
-  <meta name="twitter:image" content="https://renzonunezaf.github.io/Elecciones_2026/og-preview.png">
+<!--
+╔══════════════════════════════════════════════════════════════╗
+║  PERÚ ELIGE 2026 — Dashboard Electoral Interactivo           ║
+║  Seguimiento en vivo del conteo oficial ONPE                 ║
+║  con proyección al 100%                                      ║
+╠══════════════════════════════════════════════════════════════║
+║  Versión:   v1— abril 2026                                   ║
+║  Fuentes:   ONPE (resultadoelectoral.onpe.gob.pe)            ║
+║  Stack:     HTML/CSS/JS · D3.js · Chart.js · Cloudflare      ║
+║  Repo:      https://github.com/cintiac-21/Elecciones_2026    ║
+╚══════════════════════════════════════════════════════════════╝
+-->
+<title>Panel Electoral GURU — Inteligencia Estratégica</title>
 
-  <!-- Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<meta property="og:title" content="Panel Electoral GURU — Elecciones 2026">
+<meta property="og:description" content="Análisis dinámico y tracking electoral en vivo por NS GROUP.">
+<meta property="og:image" content="https://tu-usuario.github.io/Elecciones_2026/logo-nsg.png"> <meta property="og:url" content="https://tu-usuario.github.io/Elecciones_2026/"> <meta property="og:type" content="website">
+<meta property="og:site_name" content="NS GROUP">
 
-  <!-- D3 + TopoJSON + Chart.js -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Panel Electoral GURU — Elecciones 2026">
+<meta name="twitter:description" content="Tracking electoral en vivo por NS GROUP.">
+<meta name="twitter:image" content="https://tu-usuario.github.io/Elecciones_2026/logo-nsg.png">
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<!-- D3 + TopoJSON + Chart.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 
 <style>
-    /* ╔══════════════════════════════════════════════════════╗
-       ║  Estilos — Panel Dinámico Electoral by NS GROUP      ║
-       ╚══════════════════════════════════════════════════════╝ */
+/* ╔══════════════════════════════════════════════════════╗
+   ║  Estilos — Panel Dinámico Electoral by NS GROUP      ║
+   ╚══════════════════════════════════════════════════════╝ */
 
-    /* ══════════════ 1. VARIABLES (PALETA NS GROUP) ══════════════ */
-    :root {
-      /* Fondos oscuros corporativos */
-      --bg: #000000; 
-      --bg-card: #111111; 
-      --bg-alt: #1a1a1a;
-      --border: rgba(255,255,255,0.15);
-      
-      /* Textos */
-      --tx1: #ffffff; 
-      --tx2: #cccccc; 
-      --tx3: #888888;
-      
-      /* Colores diferenciados para candidatos */
-      --c-fuji: #e74c3c;  /* Rojo */
-      --c-rla: #3b82f6;   /* Azul NS Group */
-      --c-nieto: #2ecc71; /* Verde */
-      --c-belm: #9b59b6;  /* Púrpura */
-      --c-sanch: #f1c40f; /* Amarillo */
-      
-      /* Fondos de las barras (15% opacidad) */
-      --c-fuji-bg: rgba(231,76,60,0.15); 
-      --c-rla-bg: rgba(59,130,246,0.15);
-      --c-nieto-bg: rgba(46,204,113,0.15); 
-      --c-belm-bg: rgba(155,89,182,0.15);
-      --c-sanch-bg: rgba(241,196,15,0.15);
-      
-      /* Bordes cuadrados corporativos */
-      --radius: 0px;
-    }
-    
-    /* ══════════════ 2. RESET ══════════════ */
+/* ══════════════ 1. VARIABLES (PALETA NS GROUP) ══════════════ */
+:root {
+/* Fondos oscuros corporativos */
+--bg: #000000; 
+--bg-card: #111111; 
+--bg-alt: #1a1a1a;
+--border: rgba(255,255,255,0.15);
+
+/* Textos */
+--tx1: #ffffff; 
+--tx2: #cccccc; 
+--tx3: #888888;
+
+/* Colores diferenciados para candidatos */
+--c-fuji: #e74c3c;  /* Rojo */
+--c-rla: #3b82f6;   /* Azul NS Group */
+--c-nieto: #2ecc71; /* Verde */
+--c-belm: #9b59b6;  /* Púrpura */
+--c-sanch: #f1c40f; /* Amarillo */
+
+/* Fondos de las barras (15% opacidad) */
+--c-fuji-bg: rgba(231,76,60,0.15); 
+--c-rla-bg: rgba(59,130,246,0.15);
+--c-nieto-bg: rgba(46,204,113,0.15); 
+--c-belm-bg: rgba(155,89,182,0.15);
+--c-sanch-bg: rgba(241,196,15,0.15);
+
+/* Bordes cuadrados corporativos */
+--radius: 0px;
+}
+
+/* ══════════════ 2. RESET ══════════════ */
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     body{font-family:'Inter', 'DM Sans',sans-serif;background:var(--bg);color:var(--tx1);min-height:100vh;overflow-x:hidden}
 

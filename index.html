@@ -2635,7 +2635,16 @@ function runProjection(regions, nationalPendientesJee) {
     const sanF = 1.0 + (ef.s - 1.0) * DAMP;
 
     const pcts = [r.fuji, r.rla, r.nieto, r.belm, r.sanch];
-    const votos = pcts.map(p => (r.vv * p / 100));
+    /* Use exact integer vote counts when available (sanch_v, rla_v, etc.)
+       Falls back to vv × pct / 100 for embedded data without _v fields.
+       This fixes the ~8K vote discrepancy caused by ONPE's regional rounding. */
+    const votos = [
+      r.fuji_v  || (r.vv * r.fuji  / 100),
+      r.rla_v   || (r.vv * r.rla   / 100),
+      r.nieto_v || (r.vv * r.nieto / 100),
+      r.belm_v  || (r.vv * r.belm  / 100),
+      r.sanch_v || (r.vv * r.sanch / 100)
+    ];
 
     KEYS.forEach((k, i) => {
       totActual[i] += votos[i];

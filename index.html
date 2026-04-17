@@ -727,7 +727,7 @@
         <span id="lastUpdate">Consultando ONPE en vivo...</span>
       </div>
       <div class="hero-onpe-ts" id="onpeLastUpdate"></div>
-      <div class="hero-version">v3.9.7</div>
+      <div class="hero-version">v3.9.8</div>
     </div>
     <div class="hero-right">
       <button class="share-btn" id="shareBtn" title="Compartir">
@@ -2371,10 +2371,14 @@ async function refreshFromONPE() {
         const sCV = sNat.candidateVotes || {};
         const pv = {
           '_NATIONAL': {
+            fuji: sCV.fuji || sNat.candidates?.fuji_v || 0,
             sanch: sCV.sanch || sNat.candidates?.sanch_v || 0,
             rla: sCV.rla || sNat.candidates?.rla_v || 0,
+            nieto: sCV.nieto || sNat.candidates?.nieto_v || 0,
+            belm: sCV.belm || sNat.candidates?.belm_v || 0,
             jee: sNat.enviadasJee || 0,
             pct: sNat.pct || 0,
+            vv: sNat.votosValidos || 0,
             ts: snapData.timestamp || null,
             fechaONPE: sNat.fechaActualizacion || null,
             candPct: sNat.candidates || {}
@@ -2437,14 +2441,35 @@ async function refreshFromONPE() {
       const curCands = _currentNational.candidates;
       const K5 = ['fuji','rla','nieto','belm','sanch'];
 
-      /* 1. Ghosts: percentage delta per candidate */
+      /* 1. Ghosts: compute percentage delta from VOTE COUNTS (high precision).
+         ONPE rounds percentages to 3 decimals — 40 votes on 15.7M is invisible.
+         Computing from votes gives us 6+ decimals of precision. */
       const clientGhosts = {};
+      const prevNatData = _prevRegionVotes['_NATIONAL'] || {};
+      const prevVV = prevNatData.vv || 0;
+      const curVV = _currentNational.votosValidos || 0;
+      const curCV = _currentNational.candidateVotes || {};
       K5.forEach(k => {
-        const curr = curCands[k] || 0;
-        const prev = prevCandPct[k] || 0;
-        clientGhosts[k] = prev > 0 && Math.abs(curr - prev) > 0.0005
-          ? { prev: Number(prev.toFixed(3)), delta: Number((curr - prev).toFixed(3)) }
-          : { prev: 0, delta: 0 };
+        const currVotes = curCV[k] || 0;
+        const prevVotes = prevNatData[k] || 0;
+
+        let curr, prev;
+        if (curVV > 0 && prevVV > 0 && currVotes > 0 && prevVotes > 0) {
+          curr = currVotes / curVV * 100;
+          prev = prevVotes / prevVV * 100;
+        } else {
+          curr = curCands[k] || 0;
+          prev = prevCandPct[k] || 0;
+        }
+
+        if (prev > 0 && Math.abs(curr - prev) > 0.00001) {
+          clientGhosts[k] = { prev: Number(prev.toFixed(3)), delta: Number((curr - prev).toFixed(3)) };
+          if (clientGhosts[k].delta === 0 && Math.abs(curr - prev) > 0.00001) {
+            clientGhosts[k].delta = Number((curr - prev).toFixed(4));
+          }
+        } else {
+          clientGhosts[k] = { prev: 0, delta: 0 };
+        }
       });
 
       /* 2. Hot mover: candidate with biggest positive delta */

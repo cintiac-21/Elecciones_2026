@@ -727,7 +727,7 @@
         <span id="lastUpdate">Consultando ONPE en vivo...</span>
       </div>
       <div class="hero-onpe-ts" id="onpeLastUpdate"></div>
-      <div class="hero-version">v3.9.5</div>
+      <div class="hero-version">v3.9.6</div>
     </div>
     <div class="hero-right">
       <button class="share-btn" id="shareBtn" title="Compartir">
@@ -2375,7 +2375,8 @@ async function refreshFromONPE() {
             rla: sCV.rla || sNat.candidates?.rla_v || 0,
             jee: sNat.enviadasJee || 0,
             pct: sNat.pct || 0,
-            ts: snapData.timestamp || null
+            ts: snapData.timestamp || null,
+            fechaONPE: sNat.fechaActualizacion || null
           }
         };
         (snapData.regions || []).forEach(r => {
@@ -2917,9 +2918,9 @@ function updateDeltaTracker() {
   const baseEl = document.getElementById('deltaBaseline');
   if (baseEl && prevPct) {
     let label = '(cambios desde ONPE ' + Number(prevPct).toFixed(3) + '%';
-    const prevTs = _prevRegionVotes['_NATIONAL']?.ts;
-    if (prevTs) {
-      const d = new Date(prevTs);
+    const prevFecha = _prevRegionVotes['_NATIONAL']?.fechaONPE;
+    if (prevFecha) {
+      const d = new Date(prevFecha);
       const h = d.toLocaleTimeString('es-PE', {timeZone:'America/Lima', hour:'2-digit', minute:'2-digit', hour12:true});
       label += ' · ' + h;
     }

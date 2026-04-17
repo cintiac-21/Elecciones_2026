@@ -718,7 +718,7 @@
         <span id="lastUpdate">Consultando ONPE en vivo...</span>
       </div>
       <div class="hero-onpe-ts" id="onpeLastUpdate"></div>
-      <div class="hero-version">v3.8.8</div>
+      <div class="hero-version">v3.8.9</div>
     </div>
     <div class="hero-right">
       <button class="share-btn" id="shareBtn" title="Compartir">
@@ -2945,7 +2945,7 @@ function updateDeltaTracker() {
   let rows = '';
   significant.forEach(d => {
     const absN = Math.abs(d.net);
-    const netCls = d.net > 0 ? 'dt-pos' : d.net < 0 ? 'dt-neg' : '';
+    const netCls = d.net > 0 ? 'dt-sanch' : d.net < 0 ? 'dt-rla' : '';
     const netText = d.net === 0 ? '—' : `+${absN.toLocaleString('es-PE')} ${d.net > 0 ? 'S' : 'RLA'}`;
     const jeeStr = d.dJee !== 0 ? `<span style="color:var(--c-fuji)">${d.dJee > 0 ? '+' : ''}${d.dJee}</span>` : '—';
     rows += `<tr>
@@ -2965,7 +2965,7 @@ function updateDeltaTracker() {
   const adjJee = natDJee - totalJee;
   if (Math.abs(adjS) > 0 || Math.abs(adjR) > 0) {
     const absAdj = Math.abs(adjNet);
-    const adjNetCls = adjNet > 0 ? 'dt-pos' : adjNet < 0 ? 'dt-neg' : '';
+    const adjNetCls = adjNet > 0 ? 'dt-sanch' : adjNet < 0 ? 'dt-rla' : '';
     const adjNetText = adjNet === 0 ? '—' : `+${absAdj.toLocaleString('es-PE')} ${adjNet > 0 ? 'S' : 'RLA'}`;
     rows += `<tr style="opacity:0.6;font-style:italic">
       <td>Ajuste ONPE *</td>
@@ -2977,7 +2977,7 @@ function updateDeltaTracker() {
   }
 
   /* Total row — uses NATIONAL totals, columns now sum correctly */
-  const totalNetCls = natNet > 0 ? 'dt-pos' : 'dt-neg';
+  const totalNetCls = natNet > 0 ? 'dt-sanch' : 'dt-rla';
   const totalNetText = natNet === 0 ? '—' : `+${absNet.toLocaleString('es-PE')} ${netLabel}`;
   const totalJeeStr = natDJee !== 0 ? `<span style="color:var(--c-fuji)">${natDJee > 0 ? '+' : ''}${natDJee.toLocaleString('es-PE')}</span>` : '—';
   rows += `<tr>

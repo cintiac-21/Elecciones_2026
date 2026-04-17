@@ -2869,8 +2869,8 @@ function updateDeltaTracker() {
     const prev = _prevRegionVotes[r.name];
     if (!prev) return;
 
-    const nowS = Math.round((r.vv || 0) * (r.sanch || 0) / 100);
-    const nowR = Math.round((r.vv || 0) * (r.rla || 0) / 100);
+    const nowS = r.sanch_v || Math.round((r.vv || 0) * (r.sanch || 0) / 100);
+    const nowR = r.rla_v || Math.round((r.vv || 0) * (r.rla || 0) / 100);
     const nowJee = r.enviadasJee || 0;
     const dS = nowS - (prev.sanch || 0);
     const dR = nowR - (prev.rla || 0);

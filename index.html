@@ -532,21 +532,30 @@
 
     /* ══════════════ 12b. STATUS BAR ══════════════ */
     .status-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;
-      margin-bottom:12px;padding:8px 14px;background:var(--bg-card);border:1px solid var(--border);
+      margin-bottom:12px;padding:10px 14px;background:var(--bg-card);border:1px solid var(--border);
       border-radius:8px;opacity:0;animation:fadeUp .5s ease .3s forwards}
     .status-bar-left,.status-bar-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-    .jee-badge,.timer-badge,.pend-badge{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--tx2)}
-    .pend-badge svg{color:#E04848;opacity:.8}
-    .pend-badge strong{color:#F09595;font-family:'DM Mono',monospace}
-    .pend-badge .pend-pct{font-size:10px;color:#E04848;opacity:.7;margin-left:1px}
-    .jee-badge svg{color:var(--c-fuji);opacity:.7}
-    .jee-badge strong{color:var(--tx1);font-family:'DM Mono',monospace}
-    .jee-badge .jee-pct{font-size:10px;color:var(--c-fuji);opacity:.7;margin-left:1px}
-    .timer-badge svg{color:var(--c-nieto);opacity:.7}
-    .timer-badge strong{color:var(--c-nieto);font-family:'DM Mono',monospace;min-width:32px}
+    .pend-badge,.jee-badge{display:inline-flex;align-items:center;gap:7px;
+      padding:7px 14px;border-radius:8px;font-family:'DM Mono',monospace}
+    .pend-badge{background:rgba(224,72,72,.12);border:1px solid rgba(224,72,72,.35)}
+    .pend-badge svg{width:15px;height:15px;color:#E04848;flex-shrink:0}
+    .pend-badge .ab-label{font-size:11px;font-weight:500;color:#F09595;opacity:.7}
+    .pend-badge .ab-num{font-size:15px;font-weight:700;color:#F09595}
+    .pend-badge .ab-pct{font-size:11px;color:#E04848;opacity:.65;margin-left:2px}
+    .jee-badge{background:rgba(239,159,39,.12);border:1px solid rgba(239,159,39,.35)}
+    .jee-badge svg{width:15px;height:15px;color:#EF9F27;flex-shrink:0}
+    .jee-badge .ab-label{font-size:11px;font-weight:500;color:#FAC775;opacity:.7}
+    .jee-badge .ab-num{font-size:15px;font-weight:700;color:#FAC775}
+    .jee-badge .ab-pct{font-size:11px;color:#EF9F27;opacity:.65;margin-left:2px}
+    .timer-badge{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--tx2)}
+    .timer-badge svg{color:var(--c-nieto);opacity:.7;width:14px;height:14px}
+    .timer-badge strong{color:var(--c-nieto);font-family:'DM Mono',monospace;font-size:14px;min-width:36px}
     @media(max-width:600px){
-      .status-bar{flex-direction:column;align-items:flex-start;gap:4px;padding:6px 10px}
-      .jee-badge,.timer-badge,.pend-badge{font-size:10px}
+      .status-bar{flex-direction:column;align-items:center;gap:6px;padding:8px 10px}
+      .status-bar-left{justify-content:center}
+      .pend-badge .ab-num,.jee-badge .ab-num{font-size:13px}
+      .timer-badge{font-size:11px}
+      .timer-badge strong{font-size:12px}
     }
 
     /* ══════════════════════════════════════════
@@ -698,17 +707,23 @@
   <div class="status-bar">
     <div class="status-bar-left">
       <div class="pend-badge" id="pendBadge">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        <span>Pendientes: <strong id="pendActas">—</strong><span class="pend-pct" id="pendPct"></span></span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <div>
+          <div class="ab-label">Pendientes</div>
+          <div><span class="ab-num" id="pendActas">—</span><span class="ab-pct" id="pendPct"></span></div>
+        </div>
       </div>
       <div class="jee-badge" id="jeeBadge">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-        <span>En revisión JEE: <strong id="jeeActas">—</strong><span class="jee-pct" id="jeePct"></span></span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        <div>
+          <div class="ab-label">En revisión JEE</div>
+          <div><span class="ab-num" id="jeeActas">—</span><span class="ab-pct" id="jeePct"></span></div>
+        </div>
       </div>
     </div>
     <div class="status-bar-right">
       <div class="timer-badge" id="timerBadge">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         <span>Próximo refresh: <strong id="timerCountdown">5:00</strong></span>
       </div>
     </div>

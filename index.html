@@ -718,7 +718,7 @@
         <span id="lastUpdate">Consultando ONPE en vivo...</span>
       </div>
       <div class="hero-onpe-ts" id="onpeLastUpdate"></div>
-      <div class="hero-version">v3.8.6</div>
+      <div class="hero-version">v3.8.8</div>
     </div>
     <div class="hero-right">
       <button class="share-btn" id="shareBtn" title="Compartir">
@@ -792,7 +792,7 @@
       <div class="delta-summary" id="deltaSummary"></div>
       <table class="delta-table">
         <thead>
-          <tr><th>Región</th><th style="color:var(--c-sanch)">Sánchez</th><th style="color:var(--c-rla)">López Aliaga</th><th>Neto</th><th style="color:var(--c-fuji)">→ JEE</th></tr>
+          <tr><th>Región</th><th style="color:var(--c-sanch)">Sánchez</th><th style="color:var(--c-rla)">López Aliaga</th><th>Favorece a</th><th style="color:var(--c-fuji)">→ JEE</th></tr>
         </thead>
         <tbody id="deltaBody"></tbody>
       </table>
@@ -2869,7 +2869,7 @@ function updateDeltaTracker() {
   /* Update subtitle with prev snapshot % */
   const prevPct = _prevRegionVotes['_NATIONAL']?.pct;
   const baseEl = document.getElementById('deltaBaseline');
-  if (baseEl && prevPct) baseEl.textContent = '(cambios desde ONPE ' + Number(prevPct).toFixed(2) + '%)';
+  if (baseEl && prevPct) baseEl.textContent = '(cambios desde ONPE ' + Number(prevPct).toFixed(3) + '%)';
 
   /* Compute per-region deltas: votes + JEE */
   const deltas = [];
@@ -2920,6 +2920,7 @@ function updateDeltaTracker() {
   const natNet = natDS - natDR;
 
   /* Summary bar — uses national totals */
+  const absNet = Math.abs(natNet);
   const netColor = natNet > 0 ? 'var(--c-sanch)' : 'var(--c-rla)';
   const netLabel = natNet > 0 ? 'Sánchez' : 'López Aliaga';
   const jeeHtml = natDJee !== 0
@@ -2928,29 +2929,30 @@ function updateDeltaTracker() {
   summary.innerHTML = `
     <div class="delta-stat">
       <span class="ds-label">Sánchez:</span>
-      <span class="ds-val dt-sanch">${natDS > 0 ? '+' : ''}${natDS.toLocaleString('es-PE')}</span>
+      <span class="ds-val dt-sanch">+${natDS.toLocaleString('es-PE')}</span>
     </div>
     <div class="delta-stat">
       <span class="ds-label">López Aliaga:</span>
-      <span class="ds-val dt-rla">${natDR > 0 ? '+' : ''}${natDR.toLocaleString('es-PE')}</span>
+      <span class="ds-val dt-rla">+${natDR.toLocaleString('es-PE')}</span>
     </div>
     <div class="delta-stat">
-      <span class="ds-label">Neto:</span>
-      <span class="ds-val" style="color:${netColor}">${natNet > 0 ? '+' : ''}${natNet.toLocaleString('es-PE')} ${netLabel}</span>
+      <span class="ds-label">Favorece a:</span>
+      <span class="ds-val" style="color:${netColor}">+${absNet.toLocaleString('es-PE')} ${netLabel}</span>
     </div>
     ${jeeHtml}`;
 
   /* Table rows */
   let rows = '';
   significant.forEach(d => {
+    const absN = Math.abs(d.net);
     const netCls = d.net > 0 ? 'dt-pos' : d.net < 0 ? 'dt-neg' : '';
-    const netSign = d.net > 0 ? '+' : '';
+    const netText = d.net === 0 ? '—' : `+${absN.toLocaleString('es-PE')} ${d.net > 0 ? 'S' : 'RLA'}`;
     const jeeStr = d.dJee !== 0 ? `<span style="color:var(--c-fuji)">${d.dJee > 0 ? '+' : ''}${d.dJee}</span>` : '—';
     rows += `<tr>
       <td>${d.name}</td>
       <td class="dt-sanch">${d.dS > 0 ? '+' : ''}${d.dS.toLocaleString('es-PE')}</td>
       <td class="dt-rla">${d.dR > 0 ? '+' : ''}${d.dR.toLocaleString('es-PE')}</td>
-      <td class="${netCls}">${netSign}${d.net.toLocaleString('es-PE')}</td>
+      <td class="${netCls}">${netText}</td>
       <td>${jeeStr}</td>
     </tr>`;
   });
@@ -2962,24 +2964,27 @@ function updateDeltaTracker() {
   const adjNet = adjS - adjR;
   const adjJee = natDJee - totalJee;
   if (Math.abs(adjS) > 0 || Math.abs(adjR) > 0) {
+    const absAdj = Math.abs(adjNet);
     const adjNetCls = adjNet > 0 ? 'dt-pos' : adjNet < 0 ? 'dt-neg' : '';
+    const adjNetText = adjNet === 0 ? '—' : `+${absAdj.toLocaleString('es-PE')} ${adjNet > 0 ? 'S' : 'RLA'}`;
     rows += `<tr style="opacity:0.6;font-style:italic">
       <td>Ajuste ONPE *</td>
       <td class="dt-sanch">${adjS > 0 ? '+' : ''}${adjS.toLocaleString('es-PE')}</td>
       <td class="dt-rla">${adjR > 0 ? '+' : ''}${adjR.toLocaleString('es-PE')}</td>
-      <td class="${adjNetCls}">${adjNet > 0 ? '+' : ''}${adjNet.toLocaleString('es-PE')}</td>
+      <td class="${adjNetCls}">${adjNetText}</td>
       <td>${Math.abs(adjJee) > 0 ? adjJee.toLocaleString('es-PE') : '—'}</td>
     </tr>`;
   }
 
   /* Total row — uses NATIONAL totals, columns now sum correctly */
   const totalNetCls = natNet > 0 ? 'dt-pos' : 'dt-neg';
+  const totalNetText = natNet === 0 ? '—' : `+${absNet.toLocaleString('es-PE')} ${netLabel}`;
   const totalJeeStr = natDJee !== 0 ? `<span style="color:var(--c-fuji)">${natDJee > 0 ? '+' : ''}${natDJee.toLocaleString('es-PE')}</span>` : '—';
   rows += `<tr>
     <td>TOTAL</td>
-    <td class="dt-sanch">${natDS > 0 ? '+' : ''}${natDS.toLocaleString('es-PE')}</td>
-    <td class="dt-rla">${natDR > 0 ? '+' : ''}${natDR.toLocaleString('es-PE')}</td>
-    <td class="${totalNetCls}">${natNet > 0 ? '+' : ''}${natNet.toLocaleString('es-PE')}</td>
+    <td class="dt-sanch">+${natDS.toLocaleString('es-PE')}</td>
+    <td class="dt-rla">+${natDR.toLocaleString('es-PE')}</td>
+    <td class="${totalNetCls}">${totalNetText}</td>
     <td>${totalJeeStr}</td>
   </tr>`;
 

@@ -718,7 +718,7 @@
         <span id="lastUpdate">Consultando ONPE en vivo...</span>
       </div>
       <div class="hero-onpe-ts" id="onpeLastUpdate"></div>
-      <div class="hero-version">v3.9.2</div>
+      <div class="hero-version">v3.9.3</div>
     </div>
     <div class="hero-right">
       <button class="share-btn" id="shareBtn" title="Compartir">
@@ -2926,9 +2926,20 @@ function updateDeltaTracker() {
     }
   });
 
-  /* No changes detected */
-  if (deltas.length === 0) {
-    summary.innerHTML = '<div class="delta-stat"><span class="ds-label">ONPE no ha actualizado datos desde que se abrió la página. Los cambios aparecerán automáticamente.</span></div>';
+  /* Use NATIONAL totals (more accurate than sum of regions due to ONPE inconsistencies).
+     Compute BEFORE the early return — national can change even when no region moves. */
+  const natBaseline = _prevRegionVotes['_NATIONAL'] || {sanch: 0, rla: 0, jee: 0};
+  const natNowS = (_currentNational?.candidateVotes?.sanch) || (_currentNational?.candidates?.sanch_v) || (totalDS + natBaseline.sanch);
+  const natNowR = (_currentNational?.candidateVotes?.rla) || (_currentNational?.candidates?.rla_v) || (totalDR + natBaseline.rla);
+  const natNowJee = (_currentNational?.enviadasJee) || 0;
+  const natDS = natNowS - natBaseline.sanch;
+  const natDR = natNowR - natBaseline.rla;
+  const natDJee = natNowJee - natBaseline.jee;
+  const natNet = natDS - natDR;
+
+  /* No changes at ALL — neither regional nor national */
+  if (deltas.length === 0 && natDS === 0 && natDR === 0) {
+    summary.innerHTML = '<div class="delta-stat"><span class="ds-label">ONPE no ha actualizado datos. Los cambios aparecerán automáticamente.</span></div>';
     body.innerHTML = '';
     return;
   }
@@ -2938,17 +2949,6 @@ function updateDeltaTracker() {
 
   /* Show all regions with any movement (filter tiny rounding noise only) */
   const significant = deltas.filter(d => Math.abs(d.dS) >= 5 || Math.abs(d.dR) >= 5 || Math.abs(d.dJee) >= 1);
-
-  /* Use NATIONAL totals for summary (more accurate than sum of regions due to ONPE rounding).
-     _currentNational has the live snapshot; _prevRegionVotes._NATIONAL has the baseline. */
-  const natBaseline = _prevRegionVotes['_NATIONAL'] || {sanch: 0, rla: 0, jee: 0};
-  const natNowS = (_currentNational?.candidateVotes?.sanch) || (_currentNational?.candidates?.sanch_v) || (totalDS + natBaseline.sanch);
-  const natNowR = (_currentNational?.candidateVotes?.rla) || (_currentNational?.candidates?.rla_v) || (totalDR + natBaseline.rla);
-  const natNowJee = (_currentNational?.enviadasJee) || 0;
-  const natDS = natNowS - natBaseline.sanch;
-  const natDR = natNowR - natBaseline.rla;
-  const natDJee = natNowJee - natBaseline.jee;
-  const natNet = natDS - natDR;
 
   /* Summary bar — uses national totals */
   const absNet = Math.abs(natNet);

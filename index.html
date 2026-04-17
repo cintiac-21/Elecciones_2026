@@ -2523,6 +2523,8 @@ function runProjection(regions, nationalPendientesJee) {
       const estHistorical = EXTRANJERO_PADRON * EXTRANJERO_PARTIC_HIST; /* ~327k */
       const totalEstVV = Math.round(pctF * estObserved + (1 - pctF) * estHistorical);
       vvPend = Math.max(0, totalEstVV - r.vv);
+      r._projVvPuras = vvPend; /* Extranjero: all pending goes to puras (EF = 1.0 anyway) */
+      r._projVvJee = 0;
     } else if (r.totalActas && r.contabilizadas && r.contabilizadas > 0) {
       /* Exact method for domestic: split pure pending actas vs JEE.
          Sánchez boost applies ONLY to pure pending actas.

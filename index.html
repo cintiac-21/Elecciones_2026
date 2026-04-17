@@ -2343,9 +2343,11 @@ async function refreshFromONPE() {
     _currentNational = snap1.national || null;
     _currentCandidateVotes = snap1.national?.candidateVotes || snap1.national?.currentVotes || snap1.national?.votesByCandidate || null;
 
-    /* Fetch prev-snapshot for delta tracker (non-blocking, OK to fail) */
+    /* Fetch delta-baseline for delta tracker: the snapshot BEFORE the last ONPE update.
+       Unlike prev-snapshot (updates every 20min), delta-baseline only changes when
+       ONPE actually processes new actas. Non-blocking, OK to fail. */
     try {
-      const prevResp = await fetch(WORKER_URL + '/api/prev-snapshot');
+      const prevResp = await fetch(WORKER_URL + '/api/delta-baseline');
       if (prevResp.ok) {
         const prev = await prevResp.json();
         if (prev?.regions?.length > 0) {
@@ -2369,7 +2371,7 @@ async function refreshFromONPE() {
           });
         }
       }
-    } catch(e) { console.warn('[Delta] prev-snapshot fetch failed:', e); }
+    } catch(e) { console.warn('[Delta] delta-baseline fetch failed:', e); }
 
     /* Capture server-computed derived data (ghosts, hotMover, boost).
        Prefer snap2 (has full 26 regions so boost is populated). */

@@ -1079,37 +1079,7 @@ let _kvPrevCandidates = null;
 /* Server-computed derived data: { ghosts, hotMover, boost } — same for all clients */
 let _serverDerived = null;
 let _jeeRate = 1.0; /* Dynamic JEE acceptance rate — updated by runProjection() */
-/* Delta tracker baseline: exact votes from ONPE CSV at 93.064% (16/04/2026 18:04)
-   The delta tracker shows changes since this snapshot. */
-let _prevRegionVotes = {
-  '_NATIONAL': {sanch: 1880341, rla: 1873818, jee: 5413},
-  'Amazonas':{sanch:55364,rla:5712,jee:81},
-  'Áncash':{sanch:74268,rla:29864,jee:241},
-  'Apurímac':{sanch:79276,rla:6120,jee:47},
-  'Arequipa':{sanch:86616,rla:91660,jee:75},
-  'Ayacucho':{sanch:84615,rla:7406,jee:92},
-  'Cajamarca':{sanch:254121,rla:19744,jee:238},
-  'Callao':{sanch:16603,rla:82814,jee:126},
-  'Cusco':{sanch:141194,rla:31378,jee:77},
-  'Extranjero':{sanch:5336,rla:55496,jee:499},
-  'Huancavelica':{sanch:71344,rla:3862,jee:45},
-  'Huánuco':{sanch:92102,rla:18704,jee:211},
-  'Ica':{sanch:33740,rla:41237,jee:230},
-  'Junín':{sanch:74298,rla:46246,jee:171},
-  'La Libertad':{sanch:81396,rla:71258,jee:389},
-  'Lambayeque':{sanch:67862,rla:54753,jee:168},
-  'Lima':{sanch:189304,rla:1154017,jee:1179},
-  'Loreto':{sanch:28599,rla:19549,jee:397},
-  'Madre de Dios':{sanch:16809,rla:2459,jee:54},
-  'Moquegua':{sanch:13912,rla:6313,jee:29},
-  'Pasco':{sanch:20261,rla:7028,jee:55},
-  'Piura':{sanch:91995,rla:54199,jee:428},
-  'Puno':{sanch:156816,rla:12139,jee:102},
-  'San Martín':{sanch:86916,rla:21517,jee:162},
-  'Tacna':{sanch:24961,rla:13051,jee:52},
-  'Tumbes':{sanch:6916,rla:5956,jee:59},
-  'Ucayali':{sanch:25708,rla:11302,jee:186}
-};
+let _prevRegionVotes = null; /* Fetched from Worker /api/prev-snapshot — 100% cloud */
 /* Current national vote totals from ONPE snapshot — source of truth for real vote gaps */
 let _currentNational = null;
 let _currentCandidateVotes = null;
@@ -2373,6 +2343,34 @@ async function refreshFromONPE() {
     _currentNational = snap1.national || null;
     _currentCandidateVotes = snap1.national?.candidateVotes || snap1.national?.currentVotes || snap1.national?.votesByCandidate || null;
 
+    /* Fetch prev-snapshot for delta tracker (non-blocking, OK to fail) */
+    try {
+      const prevResp = await fetch(WORKER_URL + '/api/prev-snapshot');
+      if (prevResp.ok) {
+        const prev = await prevResp.json();
+        if (prev?.regions?.length > 0) {
+          const prevNat = prev.national || {};
+          const prevCV = prevNat.candidateVotes || {};
+          _prevRegionVotes = {
+            '_NATIONAL': {
+              sanch: prevCV.sanch || prevNat.candidates?.sanch_v || 0,
+              rla: prevCV.rla || prevNat.candidates?.rla_v || 0,
+              jee: prevNat.enviadasJee || 0,
+              pct: prevNat.pct || 0
+            }
+          };
+          prev.regions.forEach(r => {
+            if (!r.name) return;
+            _prevRegionVotes[r.name] = {
+              sanch: r.sanch_v || Math.round((r.vv||0) * (r.sanch||0) / 100),
+              rla: r.rla_v || Math.round((r.vv||0) * (r.rla||0) / 100),
+              jee: r.enviadasJee || 0
+            };
+          });
+        }
+      }
+    } catch(e) { console.warn('[Delta] prev-snapshot fetch failed:', e); }
+
     /* Capture server-computed derived data (ghosts, hotMover, boost).
        Prefer snap2 (has full 26 regions so boost is populated). */
     _serverDerived = snap2.derived || snap1.derived || null;
@@ -2407,31 +2405,7 @@ async function refreshFromONPE() {
     /* If natPct < lastCut.pct, ignore (ONPE counter went backward, JEE noise) */
     /* Note: highlightHotMover moved after renderKPIs below */
 
-    /* 3. Update baseline for delta tracker BEFORE overwriting.
-       Only update if ONPE_REGIONS has Worker data (sanch_v field exists).
-       Skip if still on embedded data (no sanch_v). */
-    if (ONPE_REGIONS.length > 0 && ONPE_REGIONS[0].sanch_v !== undefined) {
-      const natCV = _currentNational?.candidateVotes || _currentNational?.currentVotes;
-      _prevRegionVotes = {
-        '_NATIONAL': {
-          sanch: natCV?.sanch || Math.round((_currentNational?.votosValidos||0) * (_currentNational?.candidates?.sanch||0) / 100),
-          rla: natCV?.rla || Math.round((_currentNational?.votosValidos||0) * (_currentNational?.candidates?.rla||0) / 100),
-          jee: _currentNational?.enviadasJee || 0
-        }
-      };
-      ONPE_REGIONS.forEach(r => {
-        if (!r.name) return;
-        _prevRegionVotes[r.name] = {
-          sanch: r.sanch_v || 0,
-          rla: r.rla_v || 0,
-          jee: r.enviadasJee || 0
-        };
-      });
-      const baseEl = document.getElementById('deltaBaseline');
-      if (baseEl) baseEl.textContent = '(cambios desde ONPE ' + (_currentNational?.pct || 0).toFixed(2) + '%)';
-    }
-
-    /* 3b. Update regions */
+    /* 3. Update regions */
     ONPE_REGIONS.length = 0;
     allRegions.forEach(r => ONPE_REGIONS.push(r));
 
@@ -2863,12 +2837,17 @@ function updateDeltaTracker() {
   /* Always show the tracker frame */
   tracker.classList.add('visible');
 
-  /* No prev data yet — first refresh sets the baseline */
+  /* No prev data yet — Worker might not have a prev_snapshot yet */
   if (!_prevRegionVotes) {
-    summary.innerHTML = '<div class="delta-stat"><span class="ds-label">Esperando datos de ONPE para comparar...</span></div>';
+    summary.innerHTML = '<div class="delta-stat"><span class="ds-label">Esperando que ONPE actualice para mostrar cambios...</span></div>';
     body.innerHTML = '';
     return;
   }
+
+  /* Update subtitle with prev snapshot % */
+  const prevPct = _prevRegionVotes['_NATIONAL']?.pct;
+  const baseEl = document.getElementById('deltaBaseline');
+  if (baseEl && prevPct) baseEl.textContent = '(cambios desde ONPE ' + Number(prevPct).toFixed(2) + '%)';
 
   /* Compute per-region deltas: votes + JEE */
   const deltas = [];
